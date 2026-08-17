@@ -61,6 +61,16 @@ def load_finnhub_settings() -> FinnhubSettings:
 
 
 @dataclass(frozen=True)
+class FootballDataSettings:
+    api_key: str
+
+
+def load_football_data_settings() -> FootballDataSettings:
+    """Load football-data.org settings. Used by fetchers/sports.py (Phase 1)."""
+    return FootballDataSettings(api_key=get_required_env("FOOTBALL_DATA_API_KEY"))
+
+
+@dataclass(frozen=True)
 class TwilioSettings:
     account_sid: str
     auth_token: str
