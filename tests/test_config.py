@@ -5,6 +5,7 @@ from app.config import (
     get_required_env,
     load_anthropic_settings,
     load_finnhub_settings,
+    load_football_data_settings,
     load_twilio_settings,
 )
 
@@ -35,6 +36,19 @@ def test_load_finnhub_settings_raises_when_key_missing(monkeypatch: pytest.Monke
     monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
     with pytest.raises(MissingEnvVarError):
         load_finnhub_settings()
+
+
+def test_load_football_data_settings_reads_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FOOTBALL_DATA_API_KEY", "football-data-test-123")
+    assert load_football_data_settings().api_key == "football-data-test-123"
+
+
+def test_load_football_data_settings_raises_when_key_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FOOTBALL_DATA_API_KEY", raising=False)
+    with pytest.raises(MissingEnvVarError):
+        load_football_data_settings()
 
 
 def test_load_twilio_settings_reads_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:
