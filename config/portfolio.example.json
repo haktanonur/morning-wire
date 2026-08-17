@@ -1,0 +1,9 @@
+{
+  "symbols": [
+    { "ticker": "BOTZ", "label": "Global X Robotics & AI ETF" },
+    { "ticker": "KOID", "label": "Global X Humanoid Robotics ETF" },
+    { "ticker": "TSLA", "label": "Tesla" },
+    { "ticker": "IWM", "label": "iShares Russell 2000 ETF" },
+    { "ticker": "SOXQ", "label": "Invesco PHLX Semiconductor ETF" }
+  ]
+}

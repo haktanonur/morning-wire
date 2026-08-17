@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Secrets and personal data
+.env
+config/portfolio.json
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
