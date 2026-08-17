@@ -21,6 +21,7 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - Acceptance: off-season / no matches returns "nothing notable today" instead of an empty/awkward output.
 - [ ] TASK-005: `src/app/summarizer.py` — call the Claude API with a category-specific prompt to turn raw fetcher output into a short summary.
   - Acceptance: one prompt template per category; the Anthropic API call is mocked in tests; output length stays within a sane bound (see `PLAN.md` §5).
+  - Inherited from earlier tasks — the fetchers deliberately do not filter, so the prompts must: (a) Finnhub's `general` category mixes macro/market stories with general world news, so the markets prompt has to ignore the non-market ones; (b) AA Gündem carries sports stories, so the news prompt must not restate what the sports category already covers; (c) `Article.region` is `TR` or `WORLD`, so the news prompt can cover both halves without blending them.
 - [ ] TASK-006: `src/app/main.py` — CLI entrypoint. Calls all 4 fetchers, summarizes each, prints the result to the terminal grouped by category (see `PLAN.md` §6 for the output format). Each category wrapped in try/except so one failure doesn't stop the others.
   - Acceptance: running `python -m app.main` with all external calls mocked produces a full 4-section printed report in a test.
 
