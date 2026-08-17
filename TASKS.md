@@ -8,8 +8,9 @@ This file lists the discrete units of work the Agent Loop (see `AGENTS.md`) work
 ## Phase 1 — Fetch + Summarize + Terminal Output (current focus)
 No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 category summaries printed to the terminal.
 
-- [ ] TASK-001: `src/app/fetchers/portfolio.py` — use yfinance to fetch closing price and % change for each symbol in `config/portfolio.json`.
+- [x] TASK-001: `src/app/fetchers/portfolio.py` — use yfinance to fetch closing price and % change for each symbol in `config/portfolio.json`.
   - Acceptance: a missing/invalid symbol doesn't raise, it's marked as "no data"; tests mock the yfinance call.
+  - Notes: split into `load_portfolio()` (file IO) and `fetch_portfolio_prices()` (network IO) so `main.py` composes them in TASK-006. A "no data" symbol is a `PortfolioQuote` with `close=None` rather than a dropped entry, so the summarizer can still name it. A missing/malformed `config/portfolio.json` raises `PortfolioConfigError` (no silent fallback to the example file) — TASK-006's per-category try/except turns that into `[unavailable: ...]`. Uses a 5-day history window so weekends/holidays still yield a previous close.
 - [ ] TASK-002: `src/app/fetchers/market_news.py` — fetch global market headlines from Finnhub/Alpha Vantage.
   - Acceptance: an API error returns an empty list + logs a warning, never raises.
 - [ ] TASK-003: `src/app/fetchers/general_news.py` — fetch TR + global headlines via RSS (AA, Reuters World).
