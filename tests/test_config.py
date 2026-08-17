@@ -4,6 +4,7 @@ from app.config import (
     MissingEnvVarError,
     get_required_env,
     load_anthropic_settings,
+    load_finnhub_settings,
     load_twilio_settings,
 )
 
@@ -23,6 +24,17 @@ def test_load_anthropic_settings_reads_api_key(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-123")
     settings = load_anthropic_settings()
     assert settings.api_key == "sk-test-123"
+
+
+def test_load_finnhub_settings_reads_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FINNHUB_API_KEY", "finnhub-test-123")
+    assert load_finnhub_settings().api_key == "finnhub-test-123"
+
+
+def test_load_finnhub_settings_raises_when_key_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    with pytest.raises(MissingEnvVarError):
+        load_finnhub_settings()
 
 
 def test_load_twilio_settings_reads_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:

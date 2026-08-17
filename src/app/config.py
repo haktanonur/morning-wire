@@ -9,6 +9,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load the developer's .env on import so every caller sees the same environment.
+# Explicit path rather than a CWD-relative search, so `python -m app.main` behaves
+# the same regardless of the directory it was launched from. Existing environment
+# variables win over the file, which keeps CI and Lambda (Phase 3) overrides working.
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_ENV_FILE, override=False)
 
 
 class MissingEnvVarError(RuntimeError):
@@ -38,6 +48,16 @@ class AnthropicSettings:
 def load_anthropic_settings() -> AnthropicSettings:
     """Load Claude API settings from the environment. Used by summarizer.py (Phase 1)."""
     return AnthropicSettings(api_key=get_required_env("ANTHROPIC_API_KEY"))
+
+
+@dataclass(frozen=True)
+class FinnhubSettings:
+    api_key: str
+
+
+def load_finnhub_settings() -> FinnhubSettings:
+    """Load Finnhub settings from the environment. Used by fetchers/market_news.py (Phase 1)."""
+    return FinnhubSettings(api_key=get_required_env("FINNHUB_API_KEY"))
 
 
 @dataclass(frozen=True)
