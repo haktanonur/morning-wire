@@ -28,7 +28,7 @@ AWS Lambda (lambda_handler.py -> main.py)
 | `config.py` | read env vars, single entry point | none | 1 |
 | `fetchers/portfolio.py` | symbol price/change data | yfinance | 1 |
 | `fetchers/market_news.py` | global market headlines | Finnhub / Alpha Vantage | 1 |
-| `fetchers/general_news.py` | TR + global news | RSS (AA, Reuters) | 1 |
+| `fetchers/general_news.py` | TR + global news | RSS (AA Gündem/Ekonomi, BBC World) | 1 |
 | `fetchers/sports.py` | league results, NBA, F1 | API-Football, balldontlie.io, Ergast | 1 |
 | `summarizer.py` | turn raw data into a short summary | Anthropic Claude API | 1 |
 | `main.py` | orchestration, error isolation, terminal output (Phase 1) / dry-run CLI (Phase 2) | all of the above | 1–2 |

@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | Portfolio prices | yfinance | No | Effectively unlimited | Not an official API, scraping-based; can occasionally break |
 | Global market news | Finnhub market news | Yes (free tier) | 60 req/min | Alpha Vantage can be a fallback |
-| TR + global news | RSS (AA, Reuters World News) | No | Unlimited | Most stable source, no breaking-API risk |
+| TR + global news | RSS (AA Gündem, AA Ekonomi, BBC World) | No | Unlimited | Most stable source, no breaking-API risk. Reuters World News RSS was the original pick but Reuters retired its public feeds — the endpoint returns zero entries |
 | TR Super Lig, La Liga, PL, Serie A | API-Football | Yes (free tier) | Limited daily requests | Fine for 1 call/day |
 | NBA | balldontlie.io | No | Rate-limited but fine at this volume | |
 | F1 | Ergast API | No | Unlimited (archive data) | Data can lag right after a race weekend |

@@ -48,7 +48,7 @@ AWS Lambda (lambda_handler.py -> main.py)
 
 ### Category 1 — Economy and Global Markets
 Fed/ECB statements, inflation data (PCE, NFP), major index moves, FX/commodities overview, market impact of geopolitical developments.
-Source: Finnhub market news / Alpha Vantage News & Sentiment, Reuters Business RSS as a fallback.
+Source (as implemented in TASK-002): Finnhub market news only. Alpha Vantage News & Sentiment remains an unimplemented fallback option. Reuters Business RSS is no longer viable — Reuters retired its public RSS feeds.
 
 ### Category 2 — Portfolio
 For each symbol in `config/portfolio.json`: closing price, % change, and any symbol-specific news.
@@ -56,7 +56,8 @@ Source: `yfinance` (price), Finnhub company news (news).
 
 ### Category 3 — Turkey and Global Current Events
 Top political/economic/social headlines of the day.
-Source: AA RSS, Reuters World News RSS, GDELT as a supplementary source.
+Source (as implemented in TASK-003): AA RSS — Gündem and Ekonomi — for Turkey, BBC World RSS for global.
+Reuters World News RSS was the original plan, but Reuters has retired its public RSS feeds and the endpoint now returns zero entries, so BBC World replaced it. GDELT is still unused; add it only if the two current sources prove too thin.
 
 ### Category 4 — Sports
 TR Super Lig, La Liga, Premier League, Serie A results; NBA results; F1 race/qualifying results.
