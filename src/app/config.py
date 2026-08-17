@@ -30,7 +30,7 @@ def get_required_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise MissingEnvVarError(
-            f"Missing required environment variable: {name}. See .env.example."
+            f"Missing required environment variable: {name}. See the table in README.md."
         )
     return value
 
