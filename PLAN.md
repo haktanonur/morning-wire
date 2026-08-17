@@ -60,8 +60,10 @@ Source (as implemented in TASK-003): AA RSS — Gündem and Ekonomi — for Turk
 Reuters World News RSS was the original plan, but Reuters has retired its public RSS feeds and the endpoint now returns zero entries, so BBC World replaced it. GDELT is still unused; add it only if the two current sources prove too thin.
 
 ### Category 4 — Sports
-TR Super Lig, La Liga, Premier League, Serie A results; NBA results; F1 race/qualifying results.
-Source: API-Football (leagues), balldontlie.io (NBA, no key needed), Ergast API (F1, no key needed).
+Premier League, La Liga, Serie A results; F1 race results.
+Source (as implemented in TASK-004): football-data.org (leagues), Jolpica (F1, no key needed).
+All three originally planned sources fell through: API-Football's free plan refuses the current season, Ergast now answers 403, and balldontlie.io started requiring a key. Consequences: the **Turkish Super Lig is not covered** (not on football-data.org's free tier) and **NBA was dropped** from the category.
+Both sources are filtered to a recency window — the F1 endpoint always returns the last race that happened, so without one a race from before the summer break would be re-reported every morning.
 If there's nothing notable (off-season, no matches), returns "nothing notable today" instead of an empty/awkward output.
 
 ## 5. Claude API Usage
@@ -114,9 +116,9 @@ Full task breakdown in `TASKS.md`. Summary:
 
 ## 11. Accounts / API Keys Needed
 - Anthropic API key (needed starting Phase 1)
-- Finnhub or Alpha Vantage free-tier key (Phase 1)
-- API-Football free-tier key (Phase 1)
-- balldontlie.io, Ergast API — no key needed (Phase 1)
+- Finnhub free-tier key (Phase 1) — Alpha Vantage remains an unimplemented fallback
+- football-data.org free-tier key (Phase 1)
+- Jolpica (F1) — no key needed (Phase 1)
 - Twilio account + Turkey SMS delivery approval (Phase 2)
 - AWS account, free tier (Phase 3+)
 

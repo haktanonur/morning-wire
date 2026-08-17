@@ -17,10 +17,20 @@ Fetch + summarize + print to terminal. No SMS, no AWS yet. See `TASKS.md` for th
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env   # then fill in your own keys
 pre-commit install
 cp config/portfolio.example.json config/portfolio.json  # then enter your real symbols
 ```
+
+Then create a gitignored `.env` in the repo root with the keys below. `src/app/config.py` is the only module that reads them.
+
+| Variable | Needed for | Phase |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `summarizer.py` | 1 |
+| `FINNHUB_API_KEY` | `fetchers/market_news.py` | 1 |
+| `FOOTBALL_DATA_API_KEY` | `fetchers/sports.py` — free key from football-data.org | 1 |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_TO_NUMBER` | `sender.py` | 2 |
+
+`fetchers/portfolio.py` (yfinance) and the F1 half of `fetchers/sports.py` (Jolpica) need no key.
 
 ## Running Tests
 ```bash
