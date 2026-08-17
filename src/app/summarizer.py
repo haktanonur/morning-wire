@@ -65,11 +65,14 @@ NEWS_PROMPT = (
     "Prefer politics, economics and society over routine administrative notices."
 )
 
+# Deliberately names no sport. An earlier version said "football first, then
+# Formula 1", which made the model account for Formula 1 even on weeks with no
+# race ("No Formula 1 results were provided"). _format_sports already omits the
+# sections that have no data, so the prompt only has to follow the data.
 SPORTS_PROMPT = (
-    "Summarize the sports results below: football scores first, then Formula 1. "
-    "Cover only the sports actually present in the data. Give the scores and the "
-    "podium plainly; do not speculate about standings or form beyond what the "
-    "results show."
+    "Summarize the sports results below, in the order they appear. Give the "
+    "scores and any podium plainly, and write about nothing beyond what is "
+    "listed — do not speculate about standings or form."
 )
 
 
