@@ -67,7 +67,13 @@ Results are filtered to a recency window, so a Monday run picks up the weekend f
 If there's nothing notable (off-season, no matches), returns "nothing notable today" instead of an empty/awkward output.
 
 ## 5. Claude API Usage
-Each category gets its own prompt template in `src/app/summarizer.py`. Raw data (headlines, prices, scores) is passed to the model, which returns a concise summary. In Phase 1 there's no strict character limit (terminal output), but summaries should stay tight — 3-5 sentences per category — since Phase 2 will need to fit them into SMS segments (160 chars/segment) without a rewrite of the prompts. Model: Claude Haiku (sufficient for this, and cheap).
+Each category gets its own prompt template in `src/app/summarizer.py`. Raw data (headlines, prices, scores) is passed to the model, which returns a concise summary. Model: Claude Haiku (sufficient for this, and cheap).
+
+**Output language is Turkish**, since the brief is delivered by SMS to a Turkish reader. The prompts themselves stay in English (see `AGENTS.md`) and just ask for Turkish output. Phase 1's terminal output is Turkish too — it shares the same summarizer.
+
+**Length is capped at 400 characters / 2-4 sentences per category**, and the "160 chars per SMS" figure this section used to quote is wrong for this project. Turkish cannot be encoded in the GSM-7 alphabet (`ı`, `İ`, `ğ`, `Ğ`, `ş`, `Ş` and lowercase `ç` are all missing from it), so Twilio falls back to UCS-2, where a concatenated segment carries **67** characters rather than 153. `src/app/sms_text.py` folds the Turkish letters to ASCII before sending to win GSM-7 back — see `docs/adr/0005-fold-turkish-to-gsm7.md`. With the fold in place, 400 characters fits inside 3 segments (3 × 153 = 459) with room for the category tag, which measures at roughly 11 segments a day across the four categories against 28 for untouched 600-character Turkish.
+
+`_trim()` enforces the cap, but it is a backstop rather than the mechanism: it cuts at a sentence boundary, so an overlong reply loses its *last* sentence. That silently removed the world half of the news summary once, so the prompts carry the real length budget and `_trim` logs a warning whenever it fires.
 
 ## 6. Phase 1 Output Format
 `main.py` prints something like:

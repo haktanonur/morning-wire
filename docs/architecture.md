@@ -30,7 +30,8 @@ AWS Lambda (lambda_handler.py -> main.py)
 | `fetchers/market_news.py` | global market headlines | Finnhub | 1 |
 | `fetchers/general_news.py` | TR + global news | RSS (AA Gündem/Ekonomi, BBC World) | 1 |
 | `fetchers/sports.py` | football league results | football-data.org | 1 |
-| `summarizer.py` | turn raw data into a short summary | Anthropic Claude API | 1 |
+| `summarizer.py` | turn raw data into a short Turkish summary | Anthropic Claude API | 1 |
+| `sms_text.py` | fold Turkish letters into GSM-7 so a segment holds 153 chars, not 67 | none | 2 |
 | `main.py` | orchestration, error isolation, terminal output (Phase 1) / dry-run CLI (Phase 2) | all of the above | 1–2 |
 | `sender.py` | SMS delivery | Twilio | 2 |
 | `lambda_handler.py` | wraps `main.py` for AWS Lambda | AWS Lambda runtime | 3 |
