@@ -1,19 +1,15 @@
-"""Fetch recent sports results for PLAN.md category 4.
+"""Fetch recent football results for PLAN.md category 4.
 
-Two sources are polled independently so a failure costs only its own half of the
-category:
+The category has shrunk to a single source, football-data.org, covering the
+Premier League, La Liga and Serie A. The three sources named in ``PLAN.md`` all
+fell through — API-Football's free plan refuses the current season, Ergast
+answers 403, and balldontlie started requiring a key — and the two categories
+that survived on replacement sources have since been dropped by choice: NBA
+first, then Formula 1. The Turkish Süper Lig is not on football-data.org's free
+tier, so it is not covered either.
 
-* football-data.org for the European leagues (Premier League, La Liga, Serie A)
-* Jolpica, an Ergast-compatible mirror, for Formula 1
-
-Neither source named in ``PLAN.md`` survived contact with reality: the original
-Ergast API now answers 403, and API-Football's free plan refuses the current
-season. The Turkish Süper Lig is not part of football-data.org's free tier, so
-it is not covered here.
-
-Both sources are filtered to a recency window. Without it the F1 endpoint would
-repeat the same weeks-old race every morning, since it always returns the last
-race that happened regardless of how long ago that was.
+Results are filtered to a recency window so that a Monday run still picks up
+the weekend fixtures without re-reporting them all week.
 """
 
 from __future__ import annotations
@@ -30,17 +26,14 @@ from app.config import load_football_data_settings
 logger = logging.getLogger(__name__)
 
 FOOTBALL_MATCHES_URL = "https://api.football-data.org/v4/matches"
-F1_LAST_RACE_URL = "https://api.jolpi.ca/ergast/f1/current/last/results.json"
 
 # football-data.org competition codes available on the free tier.
 COMPETITIONS: tuple[str, ...] = ("PL", "PD", "SA")
 
-DEFAULT_FOOTBALL_LOOKBACK_DAYS = 2
-DEFAULT_F1_LOOKBACK_DAYS = 3
-PODIUM_SIZE = 3
+DEFAULT_LOOKBACK_DAYS = 2
 REQUEST_TIMEOUT_SECONDS = 10
 
-# What the summarizer should say when neither source had anything to report.
+# What the summarizer should say when there were no fixtures.
 NOTHING_NOTABLE = "nothing notable today"
 
 
@@ -65,53 +58,22 @@ class MatchResult:
     played_on: date
 
 
-@dataclass(frozen=True)
-class DriverResult:
-    """One driver's finishing position in a race."""
-
-    position: int
-    driver: str
-    constructor: str
-
-
-@dataclass(frozen=True)
-class RaceResult:
-    """A Formula 1 race and its podium.
-
-    Attributes:
-        name: Official race name, e.g. ``"Hungarian Grand Prix"``.
-        race_date: Date the race was held.
-        podium: Up to the top three finishers, in finishing order.
-    """
-
-    name: str
-    race_date: date
-    podium: tuple[DriverResult, ...]
-
-
-@dataclass(frozen=True)
-class SportsReport:
-    """Everything the sports category has for one run.
-
-    Either half may be empty; ``has_results`` tells the caller whether the
-    category has anything worth printing at all.
-    """
-
-    matches: tuple[MatchResult, ...]
-    race: RaceResult | None
-
-    @property
-    def has_results(self) -> bool:
-        """Whether any source returned something. False means ``NOTHING_NOTABLE``."""
-        return bool(self.matches) or self.race is not None
-
-
 def _text(raw: Any, key: str) -> str:
     """Read a string field from a payload object, defaulting to an empty string."""
     if not isinstance(raw, dict):
         return ""
     value = raw.get(key)
     return value.strip() if isinstance(value, str) else ""
+
+
+def _parse_utc_date(raw_timestamp: Any) -> date | None:
+    """Convert an ISO-8601 UTC timestamp such as ``2026-08-15T14:00:00Z`` to a date."""
+    if not isinstance(raw_timestamp, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
 
 
 def _parse_match(raw: Any) -> MatchResult | None:
@@ -151,72 +113,16 @@ def _parse_match(raw: Any) -> MatchResult | None:
     )
 
 
-def _parse_utc_date(raw_timestamp: Any) -> date | None:
-    """Convert an ISO-8601 UTC timestamp such as ``2026-08-15T14:00:00Z`` to a date."""
-    if not isinstance(raw_timestamp, str):
-        return None
-    try:
-        return datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00")).date()
-    except ValueError:
-        return None
-
-
-def _parse_driver(raw: Any) -> DriverResult | None:
-    """Build a DriverResult from one Ergast result entry, or None if unusable."""
-    if not isinstance(raw, dict):
-        return None
-    try:
-        position = int(raw["position"])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-    driver = raw.get("Driver")
-    parts = (_text(driver, "givenName"), _text(driver, "familyName"))
-    name = " ".join(part for part in parts if part)
-    if not name:
-        return None
-
-    return DriverResult(
-        position=position,
-        driver=name,
-        constructor=_text(raw.get("Constructor"), "name"),
-    )
-
-
-def _parse_race(raw: Any) -> RaceResult | None:
-    """Build a RaceResult from one Ergast race, or None if it has no usable podium."""
-    if not isinstance(raw, dict):
-        return None
-
-    name = _text(raw, "raceName")
-    if not name:
-        return None
-
-    try:
-        race_date = date.fromisoformat(raw.get("date", ""))
-    except (TypeError, ValueError):
-        return None
-
-    results = raw.get("Results")
-    if not isinstance(results, list):
-        return None
-    drivers = [driver for entry in results if (driver := _parse_driver(entry)) is not None]
-    if not drivers:
-        return None
-
-    drivers.sort(key=lambda driver: driver.position)
-    return RaceResult(name=name, race_date=race_date, podium=tuple(drivers[:PODIUM_SIZE]))
-
-
-def fetch_football_results(
+def fetch_sports(
     today: date | None = None,
-    lookback_days: int = DEFAULT_FOOTBALL_LOOKBACK_DAYS,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
 ) -> tuple[MatchResult, ...]:
     """Fetch finished league matches from the last ``lookback_days`` days.
 
     Never raises. A missing API key, a network failure, an HTTP error or a
     malformed response all produce an empty tuple plus a logged warning, so the
-    F1 half of the category still gets through.
+    sports category degrades to "nothing notable" without affecting the other
+    three categories. An empty result is also the normal off-season outcome.
 
     Args:
         today: The day the report is being generated for. Defaults to the
@@ -258,71 +164,3 @@ def fetch_football_results(
         return ()
 
     return tuple(match for raw in raw_matches if (match := _parse_match(raw)) is not None)
-
-
-def fetch_f1_result(
-    today: date | None = None,
-    lookback_days: int = DEFAULT_F1_LOOKBACK_DAYS,
-) -> RaceResult | None:
-    """Fetch the most recent F1 race, if it happened within ``lookback_days``.
-
-    Never raises. The endpoint always returns the last race that took place, so
-    the recency check is what stops a race from mid-season being re-reported
-    every morning through a three-week summer break.
-
-    Args:
-        today: The day the report is being generated for. Defaults to the
-            current UTC date; injectable so tests are deterministic.
-        lookback_days: How recent the race must be to count as news.
-
-    Returns:
-        The race and its podium, or ``None`` if there was no recent race or the
-        fetch failed.
-    """
-    today = today or datetime.now(UTC).date()
-
-    try:
-        response = requests.get(F1_LAST_RACE_URL, timeout=REQUEST_TIMEOUT_SECONDS)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception as exc:
-        logger.warning("F1 results fetch failed (%s); returning no race.", type(exc).__name__)
-        return None
-
-    races = None
-    if isinstance(payload, dict):
-        race_table = payload.get("MRData", {}).get("RaceTable", {})
-        if isinstance(race_table, dict):
-            races = race_table.get("Races")
-    if not isinstance(races, list) or not races:
-        logger.warning("F1 results response contained no races; returning no race.")
-        return None
-
-    race = _parse_race(races[0])
-    if race is None:
-        logger.warning("F1 race could not be parsed; returning no race.")
-        return None
-
-    if (today - race.race_date).days > max(lookback_days, 0):
-        return None
-    return race
-
-
-def fetch_sports(today: date | None = None) -> SportsReport:
-    """Fetch both halves of the sports category.
-
-    Never raises. An empty report is a legitimate outcome (off-season, no
-    fixtures) and the caller should render it as ``NOTHING_NOTABLE``.
-
-    Args:
-        today: The day the report is being generated for. Defaults to the
-            current UTC date; injectable so tests are deterministic.
-    """
-    today = today or datetime.now(UTC).date()
-    report = SportsReport(
-        matches=fetch_football_results(today=today),
-        race=fetch_f1_result(today=today),
-    )
-    if not report.has_results:
-        logger.info("Sports sources returned nothing for %s.", today.isoformat())
-    return report

@@ -30,7 +30,7 @@ Then create a gitignored `.env` in the repo root with the keys below. `src/app/c
 | `FOOTBALL_DATA_API_KEY` | `fetchers/sports.py` — free key from football-data.org | 1 |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_TO_NUMBER` | `sender.py` | 2 |
 
-`fetchers/portfolio.py` (yfinance) and the F1 half of `fetchers/sports.py` (Jolpica) need no key.
+`fetchers/portfolio.py` (yfinance) needs no key.
 
 ## Running Tests
 ```bash
