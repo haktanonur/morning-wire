@@ -1,8 +1,10 @@
 name: CI
 
+# Runs on every branch, not just main. Task branches are merged locally rather
+# than through pull requests, so a branch push is the only chance to get a green
+# signal *before* the merge lands.
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -15,14 +17,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Lint (ruff)
-        run: ruff check .
+      # Covers ruff lint, ruff format, the detect-secrets baseline and the
+      # whitespace/JSON hooks. Enforced here as well as in .git/hooks, because a
+      # local hook can be skipped with `git commit --no-verify` or simply never
+      # installed.
+      - name: Hooks (ruff lint + format, secret scan, whitespace)
+        run: pre-commit run --all-files
 
       - name: Type check (mypy)
         run: mypy src
