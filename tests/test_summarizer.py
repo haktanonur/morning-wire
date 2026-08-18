@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -173,6 +174,7 @@ def test_summarize_uses_the_haiku_model_and_a_token_cap(create: Any) -> None:
     assert kwargs["model"] == MODEL
     assert kwargs["max_tokens"] > 0
     assert "no headings" in kwargs["system"]
+    assert "TURKISH" in kwargs["system"], "the brief is delivered to a Turkish reader"
 
 
 def test_summarize_trims_an_overlong_summary_at_a_sentence_boundary(create: Any) -> None:
@@ -183,6 +185,25 @@ def test_summarize_trims_an_overlong_summary_at_a_sentence_boundary(create: Any)
 
     assert len(summary) <= MAX_SUMMARY_CHARS
     assert summary.endswith(".")
+
+
+def test_summarize_warns_when_it_has_to_trim(create: Any, caplog: pytest.LogCaptureFixture) -> None:
+    """Trimming drops the last sentence silently, so it has to be visible in the log."""
+    create.return_value = _reply("Padding for the length cap. " * 40)
+
+    with caplog.at_level(logging.WARNING):
+        summarize_markets([_headline()])
+
+    assert "over the" in caplog.text
+
+
+def test_summarize_does_not_warn_when_the_summary_already_fits(
+    create: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.WARNING):
+        summarize_markets([_headline()])
+
+    assert not caplog.records
 
 
 def test_summarize_does_not_trim_at_a_decimal_point(create: Any) -> None:

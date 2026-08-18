@@ -13,6 +13,7 @@ that category as ``[unavailable: ...]``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import anthropic
@@ -23,19 +24,30 @@ from app.fetchers.market_news import Headline
 from app.fetchers.portfolio import PortfolioQuote
 from app.fetchers.sports import NOTHING_NOTABLE, MatchResult
 
+logger = logging.getLogger(__name__)
+
 MODEL = "claude-haiku-4-5-20251001"
 
 # Phase 1 prints to a terminal, but Phase 2 has to fit these into SMS segments,
 # so the length is capped now rather than after the prompts are tuned.
+#
+# 400 comes off the segment arithmetic rather than taste. Once sms_text.to_gsm7
+# has folded the Turkish letters, a concatenated segment carries 153 characters,
+# so three of them hold 459 — 400 keeps a category inside three segments with
+# room left for the tag sender.py (TASK-007) puts in front of it. Measured
+# against real feeds that is about 11 segments a day across the four categories,
+# against 28 for the same Turkish text left at 600 characters and unfolded.
 MAX_TOKENS = 400
-MAX_SUMMARY_CHARS = 600
+MAX_SUMMARY_CHARS = 400
 
-NO_DATA = "No data available today."
+NO_DATA = "Bugün için veri yok."
 
+# The prompts stay in English (AGENTS.md keeps code English) but ask for Turkish
+# output, because the brief is delivered by SMS to a Turkish reader.
 SYSTEM_PROMPT = (
-    "You write one section of a personal morning briefing. Reply with 3-5 plain "
-    "sentences of prose: no headings, no bullet points, no markdown, no preamble "
-    "such as 'Here is your summary'. Keep the whole reply under 600 characters. "
+    "You write one section of a personal morning briefing. Reply in TURKISH, in "
+    "2-4 plain sentences of prose: no headings, no bullet points, no markdown, no "
+    "preamble such as 'İşte özetiniz'. Keep the whole reply under 400 characters. "
     "Report only what the supplied data says and never invent a number, name or "
     "event that is not in it. Never point out that something is missing from the "
     "data — just leave it out. Give no investment advice or recommendations."
@@ -56,13 +68,20 @@ PORTFOLIO_PROMPT = (
 )
 
 NEWS_PROMPT = (
-    "Summarize the day's current events from the headlines below. Write exactly "
-    "two sentences about the TURKEY headlines, then exactly two sentences about "
-    "the WORLD headlines. Both groups must appear; the feed simply carries more "
-    "Turkish headlines than world ones, which is not a reason to skip the world "
-    "half. Ignore every sports headline, including national teams, individual "
-    "athletes and tournaments — a separate sports section already covers them. "
-    "Prefer politics, economics and society over routine administrative notices."
+    "Summarize the day's current events from the headlines below. Your reply must "
+    "be exactly three sentences, structured like this and overriding any other "
+    "sentence count:\n"
+    "1. A sentence on the TURKEY headlines.\n"
+    "2. A second sentence on the TURKEY headlines.\n"
+    "3. A sentence on the WORLD headlines, combining several of them if needed.\n"
+    "Sentence 3 is mandatory. The feed carries twice as many Turkish headlines as "
+    "world ones, which is not a reason to spend all three sentences on Turkey. "
+    "Keep every sentence under 120 characters: a reply that overruns is trimmed at "
+    "a sentence boundary, and sentence 3 is the one that would be lost.\n"
+    "Ignore every sports headline — any league, club, national team, athlete, "
+    "tournament, qualifier or ranking, in any sport — because a separate sports "
+    "section already covers them. Prefer politics, economics and society over "
+    "routine administrative notices."
 )
 
 SPORTS_PROMPT = (
@@ -139,9 +158,20 @@ def _trim(summary: str) -> str:
 
     The boundary is ``". "`` rather than ``"."`` so that a decimal point in a
     price or percentage is not mistaken for the end of a sentence.
+
+    This is a backstop, not the primary length control — the prompts are. It
+    logs when it fires because dropping the final sentence is invisible in the
+    output: an overlong news summary once lost its world half here, and the
+    missing half looked exactly like the model ignoring the prompt.
     """
     if len(summary) <= MAX_SUMMARY_CHARS:
         return summary
+
+    logger.warning(
+        "Summary ran to %d characters, over the %d cap; trimming may drop its last sentence.",
+        len(summary),
+        MAX_SUMMARY_CHARS,
+    )
     cutoff = summary.rfind(". ", 0, MAX_SUMMARY_CHARS)
     if cutoff == -1:
         return summary[:MAX_SUMMARY_CHARS].rstrip()

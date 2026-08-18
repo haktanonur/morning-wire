@@ -33,8 +33,9 @@ COMPETITIONS: tuple[str, ...] = ("PL", "PD", "SA")
 DEFAULT_LOOKBACK_DAYS = 2
 REQUEST_TIMEOUT_SECONDS = 10
 
-# What the summarizer should say when there were no fixtures.
-NOTHING_NOTABLE = "nothing notable today"
+# What the summarizer renders when there were no fixtures. Turkish, like the
+# summaries themselves, because it goes into the brief verbatim.
+NOTHING_NOTABLE = "Bugün kayda değer bir sonuç yok."
 
 
 @dataclass(frozen=True)
