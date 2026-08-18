@@ -5,7 +5,7 @@ Every morning, without manually scanning the news, get a personalized summary ac
 1. Economy and global markets
 2. Personal portfolio status (today's close + change)
 3. Turkey and global current events (politics/news)
-4. Sports: TR Super Lig, La Liga, Premier League, Serie A, NBA, F1
+4. Sports: TR Super Lig, La Liga, Premier League, Serie A, NBA, F1 (as implemented: Premier League, La Liga, Serie A only — see §4)
 
 **Current milestone (Phase 1):** fetch + summarize + print to the terminal. SMS delivery and cloud deployment are deliberately deferred to later phases so the core data/summarization logic can be built and reviewed first, without the added complexity of Twilio and AWS.
 
@@ -60,10 +60,10 @@ Source (as implemented in TASK-003): AA RSS — Gündem and Ekonomi — for Turk
 Reuters World News RSS was the original plan, but Reuters has retired its public RSS feeds and the endpoint now returns zero entries, so BBC World replaced it. GDELT is still unused; add it only if the two current sources prove too thin.
 
 ### Category 4 — Sports
-Premier League, La Liga, Serie A results; F1 race results.
-Source (as implemented in TASK-004): football-data.org (leagues), Jolpica (F1, no key needed).
-All three originally planned sources fell through: API-Football's free plan refuses the current season, Ergast now answers 403, and balldontlie.io started requiring a key. Consequences: the **Turkish Super Lig is not covered** (not on football-data.org's free tier) and **NBA was dropped** from the category.
-Both sources are filtered to a recency window — the F1 endpoint always returns the last race that happened, so without one a race from before the summer break would be re-reported every morning.
+Premier League, La Liga, Serie A results.
+Source (as implemented in TASK-004): football-data.org.
+All three originally planned sources fell through: API-Football's free plan refuses the current season, Ergast now answers 403, and balldontlie.io started requiring a key. Consequences: the **Turkish Super Lig is not covered** (not on football-data.org's free tier) and **NBA was dropped** from the category. **F1 was later dropped by choice**, so the category is football only.
+Results are filtered to a recency window, so a Monday run picks up the weekend fixtures without re-reporting them all week.
 If there's nothing notable (off-season, no matches), returns "nothing notable today" instead of an empty/awkward output.
 
 ## 5. Claude API Usage
@@ -118,7 +118,6 @@ Full task breakdown in `TASKS.md`. Summary:
 - Anthropic API key (needed starting Phase 1)
 - Finnhub free-tier key (Phase 1) — Alpha Vantage remains an unimplemented fallback
 - football-data.org free-tier key (Phase 1)
-- Jolpica (F1) — no key needed (Phase 1)
 - Twilio account + Turkey SMS delivery approval (Phase 2)
 - AWS account, free tier (Phase 3+)
 

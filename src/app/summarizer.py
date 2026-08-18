@@ -21,7 +21,7 @@ from app.config import load_anthropic_settings
 from app.fetchers.general_news import REGION_TR, Article
 from app.fetchers.market_news import Headline
 from app.fetchers.portfolio import PortfolioQuote
-from app.fetchers.sports import NOTHING_NOTABLE, SportsReport
+from app.fetchers.sports import NOTHING_NOTABLE, MatchResult
 
 MODEL = "claude-haiku-4-5-20251001"
 
@@ -65,14 +65,10 @@ NEWS_PROMPT = (
     "Prefer politics, economics and society over routine administrative notices."
 )
 
-# Deliberately names no sport. An earlier version said "football first, then
-# Formula 1", which made the model account for Formula 1 even on weeks with no
-# race ("No Formula 1 results were provided"). _format_sports already omits the
-# sections that have no data, so the prompt only has to follow the data.
 SPORTS_PROMPT = (
-    "Summarize the sports results below, in the order they appear. Give the "
-    "scores and any podium plainly, and write about nothing beyond what is "
-    "listed — do not speculate about standings or form."
+    "Summarize the football results below, in the order they appear. Give the "
+    "scores plainly and write about nothing beyond what is listed — do not "
+    "speculate about standings or form."
 )
 
 
@@ -117,25 +113,13 @@ def _format_articles(articles: list[Article]) -> str:
     return "\n\n".join(sections)
 
 
-def _format_sports(report: SportsReport) -> str:
-    """Render football scores and the F1 podium."""
-    sections = []
-    if report.matches:
-        body = "\n".join(
-            f"- {match.competition}: {match.home_team} {match.home_score}-"
-            f"{match.away_score} {match.away_team} ({match.played_on.isoformat()})"
-            for match in report.matches
-        )
-        sections.append(f"FOOTBALL:\n{body}")
-    if report.race is not None:
-        body = "\n".join(
-            f"- {driver.position}. {driver.driver} ({driver.constructor})"
-            for driver in report.race.podium
-        )
-        sections.append(
-            f"FORMULA 1 — {report.race.name}, {report.race.race_date.isoformat()}:\n{body}"
-        )
-    return "\n\n".join(sections)
+def _format_matches(matches: tuple[MatchResult, ...]) -> str:
+    """Render football results as one line per match."""
+    return "\n".join(
+        f"- {match.competition}: {match.home_team} {match.home_score}-"
+        f"{match.away_score} {match.away_team} ({match.played_on.isoformat()})"
+        for match in matches
+    )
 
 
 def _extract_text(message: Any) -> str:
@@ -218,12 +202,12 @@ def summarize_news(articles: list[Article]) -> str:
     return _summarize(NEWS_PROMPT, _format_articles(articles))
 
 
-def summarize_sports(report: SportsReport) -> str:
+def summarize_sports(matches: tuple[MatchResult, ...]) -> str:
     """Summarize the sports category.
 
     An off-season run with no fixtures is a normal outcome, so it short-circuits
     to ``NOTHING_NOTABLE`` instead of asking Claude to describe an empty list.
     """
-    if not report.has_results:
+    if not matches:
         return NOTHING_NOTABLE
-    return _summarize(SPORTS_PROMPT, _format_sports(report))
+    return _summarize(SPORTS_PROMPT, _format_matches(matches))

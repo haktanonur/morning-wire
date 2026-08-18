@@ -8,13 +8,7 @@ from pytest_mock import MockerFixture
 from app.fetchers.general_news import REGION_TR, REGION_WORLD, Article
 from app.fetchers.market_news import Headline
 from app.fetchers.portfolio import PortfolioQuote
-from app.fetchers.sports import (
-    NOTHING_NOTABLE,
-    DriverResult,
-    MatchResult,
-    RaceResult,
-    SportsReport,
-)
+from app.fetchers.sports import NOTHING_NOTABLE, MatchResult
 from app.summarizer import (
     MAX_SUMMARY_CHARS,
     MODEL,
@@ -73,22 +67,15 @@ def _article(**overrides: Any) -> Article:
     return Article(**fields)
 
 
-def _sports_report() -> SportsReport:
-    return SportsReport(
-        matches=(
-            MatchResult(
-                competition="Premier League",
-                home_team="Arsenal FC",
-                away_team="Chelsea FC",
-                home_score=2,
-                away_score=1,
-                played_on=date(2026, 8, 16),
-            ),
-        ),
-        race=RaceResult(
-            name="Hungarian Grand Prix",
-            race_date=date(2026, 8, 16),
-            podium=(DriverResult(position=1, driver="Lando Norris", constructor="McLaren"),),
+def _matches() -> tuple[MatchResult, ...]:
+    return (
+        MatchResult(
+            competition="Premier League",
+            home_team="Arsenal FC",
+            away_team="Chelsea FC",
+            home_score=2,
+            away_score=1,
+            played_on=date(2026, 8, 16),
         ),
     )
 
@@ -116,7 +103,7 @@ def test_summarize_news_returns_no_data_without_calling_the_api(create: Any) -> 
 
 
 def test_summarize_sports_returns_nothing_notable_in_the_off_season(create: Any) -> None:
-    assert summarize_sports(SportsReport(matches=(), race=None)) == NOTHING_NOTABLE
+    assert summarize_sports(()) == NOTHING_NOTABLE
     create.assert_not_called()
 
 
@@ -168,29 +155,12 @@ def test_summarize_news_omits_a_region_with_no_articles(create: Any) -> None:
     assert "TURKEY:" not in prompt
 
 
-def test_summarize_sports_renders_scores_and_the_podium(create: Any) -> None:
-    summarize_sports(_sports_report())
+def test_summarize_sports_renders_the_scores(create: Any) -> None:
+    assert summarize_sports(_matches()) == "A tidy summary."
 
     prompt = _sent_prompt(create)
     assert "Premier League: Arsenal FC 2-1 Chelsea FC (2026-08-16)" in prompt
-    assert "Hungarian Grand Prix, 2026-08-16" in prompt
-    assert "1. Lando Norris (McLaren)" in prompt
-
-
-def test_summarize_sports_handles_football_only(create: Any) -> None:
-    summarize_sports(SportsReport(matches=_sports_report().matches, race=None))
-
-    prompt = _sent_prompt(create)
-    assert "FOOTBALL:" in prompt
-    assert "FORMULA 1" not in prompt
-
-
-def test_summarize_sports_handles_f1_only(create: Any) -> None:
-    summarize_sports(SportsReport(matches=(), race=_sports_report().race))
-
-    prompt = _sent_prompt(create)
-    assert "FOOTBALL:" not in prompt
-    assert "FORMULA 1" in prompt
+    assert "do not speculate" in prompt
 
 
 # --- shared API behaviour ---------------------------------------------------
