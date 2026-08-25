@@ -6,7 +6,7 @@ from app.config import (
     load_anthropic_settings,
     load_finnhub_settings,
     load_football_data_settings,
-    load_twilio_settings,
+    load_macrodroid_settings,
 )
 
 
@@ -51,15 +51,14 @@ def test_load_football_data_settings_raises_when_key_missing(
         load_football_data_settings()
 
 
-def test_load_twilio_settings_reads_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "sid")
-    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "token")
-    monkeypatch.setenv("TWILIO_FROM_NUMBER", "+1000")
-    monkeypatch.setenv("TWILIO_TO_NUMBER", "+2000")
+def test_load_macrodroid_settings_reads_the_trigger_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MACRODROID_TRIGGER_URL", "https://trigger.macrodroid.com/id/name")
+    assert load_macrodroid_settings().trigger_url == "https://trigger.macrodroid.com/id/name"
 
-    settings = load_twilio_settings()
 
-    assert settings.account_sid == "sid"
-    assert settings.auth_token == "token"
-    assert settings.from_number == "+1000"
-    assert settings.to_number == "+2000"
+def test_load_macrodroid_settings_raises_when_the_url_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MACRODROID_TRIGGER_URL", raising=False)
+    with pytest.raises(MissingEnvVarError):
+        load_macrodroid_settings()

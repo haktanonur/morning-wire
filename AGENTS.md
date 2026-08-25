@@ -12,7 +12,7 @@ A personal daily-briefing system. Currently in **Phase 1**: fetch data for 4 cat
 - pytest + pytest-mock + responses (testing)
 - ruff (lint + format), mypy (static type checking)
 - pre-commit (pre-commit hooks)
-- (Phase 2+) Twilio for SMS, AWS Lambda + EventBridge for deployment
+- (Phase 2+) MacroDroid webhook for SMS, AWS Lambda + EventBridge for deployment
 
 ## Repository Structure
 ```
@@ -21,7 +21,7 @@ src/app/
   fetchers/             # one isolated module per data source
   summarizer.py          # Claude API calls
   main.py                 # Phase 1: CLI entrypoint, prints summaries to terminal
-  sender.py               # (Phase 2) Twilio SMS delivery
+  sender.py               # (Phase 2) SMS delivery via a MacroDroid webhook
   lambda_handler.py       # (Phase 3) wraps main.py logic for AWS Lambda
 tests/                    # mirrors src/app structure 1:1
 config/portfolio.example.json   # example symbol list (real list is gitignored)

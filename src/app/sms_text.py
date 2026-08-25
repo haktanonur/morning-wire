@@ -1,15 +1,20 @@
 """Fold Turkish text into the GSM-7 alphabet so an SMS costs half as many segments.
 
-Twilio picks the encoding from the message body: one character outside GSM-7 is
-enough to force UCS-2 for the *whole* message, and a concatenated UCS-2 segment
-carries 67 characters where a GSM-7 one carries 153. Turkish guarantees that
-fallback — ``ı``, ``İ``, ``ğ``, ``Ğ``, ``ş``, ``Ş`` and lowercase ``ç`` are all
-missing from GSM-7 — so an untouched Turkish brief costs roughly twice what it
-needs to.
+Whatever sends the message picks the encoding from the body: one character
+outside GSM-7 is enough to force UCS-2 for the *whole* message, and a
+concatenated UCS-2 segment carries 67 characters where a GSM-7 one carries 153.
+Turkish guarantees that fallback — ``ı``, ``İ``, ``ğ``, ``Ğ``, ``ş``, ``Ş`` and
+lowercase ``ç`` are all missing from GSM-7 — so an untouched Turkish brief takes
+roughly twice the segments it needs to.
 
 Dropping the diacritics ("Ortadogu" for "Ortadoğu") is a readability trade the
-owner accepted to halve that. Only the SMS body is folded; ``main.py``'s
-terminal output keeps proper Turkish.
+owner accepted to halve that. Since the move to MacroDroid the segments come out
+of the owner's own mobile plan rather than a Twilio bill, so the fold now buys
+fewer messages on the phone and an ASCII-only body that survives a URL query
+parameter intact, rather than a smaller invoice — see ``docs/adr/0005`` and
+``docs/adr/0006``.
+
+Only the SMS body is folded; ``main.py``'s terminal output keeps proper Turkish.
 """
 
 from __future__ import annotations

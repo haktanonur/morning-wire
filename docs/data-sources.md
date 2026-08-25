@@ -9,4 +9,4 @@
 | F1 | — | — | — | Dropped from the category by choice. It had run on Jolpica, an Ergast-compatible mirror, since the original Ergast API answers 403 |
 | NBA | — | — | — | Dropped from the category: balldontlie.io started requiring an API key |
 | Summarization | Anthropic Claude API | Yes | Usage-based, paid | Haiku model is sufficient and cheap |
-| SMS delivery (Phase 2) | Twilio | Yes | Paid per SMS | Sending to Turkish numbers may require account verification |
+| SMS delivery (Phase 2) | MacroDroid webhook → owner's own phone | The trigger URL is itself the credential | Free; the SMS come out of the owner's mobile plan | Twilio and NetGSM were both rejected — each requires a registered sender id, and Twilio bans P2P traffic in Turkey (ADR 0006). `200 ok` means the relay queued a push, **not** that the SMS was sent |

@@ -7,7 +7,7 @@ Every morning, without manually scanning the news, get a personalized summary ac
 3. Turkey and global current events (politics/news)
 4. Sports: TR Super Lig, La Liga, Premier League, Serie A, NBA, F1 (as implemented: Premier League, La Liga, Serie A only — see §4)
 
-**Current milestone (Phase 1):** fetch + summarize + print to the terminal. SMS delivery and cloud deployment are deliberately deferred to later phases so the core data/summarization logic can be built and reviewed first, without the added complexity of Twilio and AWS.
+**Current milestone (Phase 1):** fetch + summarize + print to the terminal. SMS delivery and cloud deployment are deliberately deferred to later phases so the core data/summarization logic can be built and reviewed first, without the added complexity of SMS delivery and AWS.
 
 ## 2. Out of Scope (Deliberate Decisions)
 - No real-time/instant alerts — once a day
@@ -35,14 +35,17 @@ Each category runs in its own try/except block — one failing fetcher does not 
 
 ### Phase 2+ (later)
 ```
-EventBridge (cron, daily 08:00 Istanbul)
+EventBridge (cron(0 3 * * ? *) — 06:00 Istanbul, 03:00 UTC)
         |
 AWS Lambda (lambda_handler.py -> main.py)
         |
    [same 4 fetchers + summarizer as Phase 1]
         |
-   Twilio: 4 tagged SMS messages instead of terminal print
+   MacroDroid webhook -> owner's Android phone -> 4 tagged SMS
+        (markets -> portfolio -> news -> sports)
 ```
+
+Türkiye dropped daylight saving in 2016 and sits on UTC+3 all year, so the cron is a fixed UTC expression with no seasonal correction.
 
 ## 4. Category Design
 
@@ -73,6 +76,8 @@ Each category gets its own prompt template in `src/app/summarizer.py`. Raw data 
 
 **Length is capped at 400 characters / 2-4 sentences per category**, and the "160 chars per SMS" figure this section used to quote is wrong for this project. Turkish cannot be encoded in the GSM-7 alphabet (`ı`, `İ`, `ğ`, `Ğ`, `ş`, `Ş` and lowercase `ç` are all missing from it), so Twilio falls back to UCS-2, where a concatenated segment carries **67** characters rather than 153. `src/app/sms_text.py` folds the Turkish letters to ASCII before sending to win GSM-7 back — see `docs/adr/0005-fold-turkish-to-gsm7.md`. With the fold in place, 400 characters fits inside 3 segments (3 × 153 = 459) with room for the category tag, which measures at roughly 11 segments a day across the four categories against 28 for untouched 600-character Turkish.
 
+Since the switch to MacroDroid (§7) those segments come out of the owner's own mobile plan rather than a Twilio bill, so the arithmetic above is now about fitting the message rather than about cost.
+
 `_trim()` enforces the cap, but it is a backstop rather than the mechanism: it cuts at a sentence boundary, so an overlong reply loses its *last* sentence. That silently removed the world half of the news summary once, so the prompts carry the real length budget and `_trim` logs a warning whenever it fires.
 
 ## 6. Phase 1 Output Format
@@ -92,8 +97,12 @@ Each category gets its own prompt template in `src/app/summarizer.py`. Raw data 
 ```
 If a category fails, its section prints `[unavailable: <short reason>]` instead of crashing the run.
 
-## 7. Phase 2 — SMS Delivery (Twilio)
-4 categories = 4 separate Twilio calls, each prefixed with a category tag (e.g. `[MARKETS]`, `[PORTFOLIO]`). `main.py` gains a `--dry-run` flag that reuses the Phase 1 terminal-print path instead of sending. Default send order: markets → portfolio → news → sports (see open decisions in `TASKS.md`).
+## 7. Phase 2 — SMS Delivery (MacroDroid)
+4 categories = 4 separate webhook calls, each prefixed with a category tag (e.g. `[MARKETS]`, `[PORTFOLIO]`). `main.py` gains a `--dry-run` flag that reuses the Phase 1 terminal-print path instead of sending. Send order: markets → portfolio → news → sports.
+
+**Twilio was the original plan and was dropped**: its Turkey guidelines prohibit person-to-person traffic, which is exactly this use case, and require a registered alphanumeric sender id with corporate documents. NetGSM has the same registration problem. Instead `sender.py` calls a MacroDroid webhook and the owner's own Android phone sends the SMS from its own SIM — no registration, no per-segment bill, and no new Python dependency. See `docs/adr/0006-macrodroid-over-twilio.md` for the phone-side contract, which is not visible from this repo.
+
+The trade is that **delivery is no longer observable**. The webhook is a cloud relay: it answers `200 ok` once it has queued a push to the phone, and answers identically when the phone is off, offline or out of credit. `SendOutcome.accepted` means the relay took it, not that the message arrived, and §9's error handling cannot cover that last hop.
 
 ## 8. Phase 3+ — AWS Infrastructure
 | Component | Service | Why |
@@ -115,7 +124,7 @@ Rationale details in `docs/adr/0003-aws-lambda-serverless.md`.
 Full task breakdown in `TASKS.md`. Summary:
 1. Phase 0 — Skeleton (done: this file set + example `config.py`)
 2. **Phase 1 — Fetch + summarize + terminal output (current focus)**
-3. Phase 2 — SMS delivery (Twilio)
+3. Phase 2 — SMS delivery (MacroDroid webhook)
 4. Phase 3 — Lambda orchestration wrapper
 5. Phase 4 — AWS deployment (IaC, EventBridge)
 6. Phase 5 — Hardening (logging, integration test, docs)
@@ -124,7 +133,7 @@ Full task breakdown in `TASKS.md`. Summary:
 - Anthropic API key (needed starting Phase 1)
 - Finnhub free-tier key (Phase 1) — Alpha Vantage remains an unimplemented fallback
 - football-data.org free-tier key (Phase 1)
-- Twilio account + Turkey SMS delivery approval (Phase 2)
+- MacroDroid on an Android phone, with a webhook macro and its trigger URL (Phase 2) — no account approval needed, unlike the Twilio/NetGSM routes this replaced
 - AWS account, free tier (Phase 3+)
 
 ## 12. Open Decisions

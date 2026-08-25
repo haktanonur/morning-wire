@@ -46,7 +46,7 @@ def test_to_gsm7_leaves_plain_ascii_untouched() -> None:
     ],
 )
 def test_to_gsm7_output_never_forces_ucs2(text: str) -> None:
-    """The whole point: after folding, Twilio must not fall back to UCS-2."""
+    """The whole point: after folding, nothing downstream may fall back to UCS-2."""
     assert all(char in GSM7_BASIC or char in GSM7_EXTENSION for char in to_gsm7(text))
 
 

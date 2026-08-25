@@ -12,7 +12,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Added in Phase 2+: "twilio>=9.0", "boto3>=1.34"
+# Added in Phase 3+: "boto3>=1.34". Phase 2's SMS delivery needs no new dependency:
+# it is one HTTP call to a MacroDroid webhook, so `requests` already covers it.
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
