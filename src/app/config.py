@@ -71,18 +71,15 @@ def load_football_data_settings() -> FootballDataSettings:
 
 
 @dataclass(frozen=True)
-class TwilioSettings:
-    account_sid: str
-    auth_token: str
-    from_number: str
-    to_number: str
+class MacroDroidSettings:
+    trigger_url: str
 
 
-def load_twilio_settings() -> TwilioSettings:
-    """Load Twilio settings from the environment. Used by sender.py (Phase 2, not yet built)."""
-    return TwilioSettings(
-        account_sid=get_required_env("TWILIO_ACCOUNT_SID"),
-        auth_token=get_required_env("TWILIO_AUTH_TOKEN"),
-        from_number=get_required_env("TWILIO_FROM_NUMBER"),
-        to_number=get_required_env("TWILIO_TO_NUMBER"),
-    )
+def load_macrodroid_settings() -> MacroDroidSettings:
+    """Load the MacroDroid webhook settings. Used by sender.py (Phase 2).
+
+    The trigger URL is itself the credential — it embeds the device id, and
+    anyone holding it can fire the macro — so it is read from the environment
+    like any other secret rather than written into the code.
+    """
+    return MacroDroidSettings(trigger_url=get_required_env("MACRODROID_TRIGGER_URL"))

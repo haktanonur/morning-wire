@@ -28,20 +28,22 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - Acceptance: running `python -m app.main` with all external calls mocked produces a full 4-section printed report in a test.
   - Notes: `build_section()` is the single error-isolation boundary — nothing a fetcher or the summarizer raises gets past it. The `[unavailable: ...]` reason is `str(exc)` falling back to the exception type, which is why `summarizer.py` sanitizes its own message rather than leaving that to `main.py`. The report goes to stdout and warnings to stderr, so the output stays pipeable. A `runpy.run_module` test for the literal `python -m` path was written and then **removed**: `run_module` re-executes the module, so the mocks bound to the already-imported `app.main` don't apply and the test silently hit the real network (4.2s of the suite's runtime). `main()` is what the `__main__` guard calls, so testing `main()` directly covers the same path honestly. The end-to-end run also caught a summarizer regression: naming Formula 1 in `SPORTS_PROMPT` made the model report its *absence* on race-free weeks, so the prompt now names no sport at all and just follows the data.
 
-## Phase 2 — SMS Delivery (Twilio)
+## Phase 2 — SMS Delivery (MacroDroid webhook → owner's phone)
 - [x] TASK-016: Turkish brief output + `src/app/sms_text.py` — make the summaries Turkish and fold them into GSM-7 so an SMS segment holds 153 characters instead of 67. Prerequisite for TASK-007, which is why it lands first.
   - Acceptance: `to_gsm7` output contains nothing outside the GSM-7 alphabet; the terminal output keeps proper Turkish.
   - Notes: **the "160 chars per SMS" assumption in `PLAN.md` §5 was wrong for this project** — Turkish forces UCS-2 (67 chars/segment), so the untouched brief cost 28 segments/day. Folding the diacritics plus dropping `MAX_SUMMARY_CHARS` from 600 to 400 brings that to ~11; the fold contributes more of the saving than the shorter cap. See `docs/adr/0005`. The fold uses NFD decomposition rather than a hand-written table, which covers `ç ğ ö ş ü` and the accented Latin letters for free; only dotless `ı` and typographic punctuation (em dash, curly quotes, ellipsis) need explicit entries — and those matter, since one em dash left in place drags the whole message back to UCS-2. A live-run bug cost six debugging runs and is worth remembering: the news summary kept losing its world half, which looked exactly like the model ignoring the prompt, but the model *was* writing it — the reply ran to 486 characters and `_trim` cut at the last sentence boundary under the cap, amputating it. `_trim` now logs a warning when it fires, and the news prompt carries a per-sentence budget so it stops overrunning. Prompts stay English and ask for Turkish output.
-- [ ] TASK-007: `src/app/sender.py` — send a category-tagged SMS via Twilio. Must pass the body through `sms_text.to_gsm7()`.
-  - Acceptance: a send failure for one category doesn't block the others; Twilio calls are mocked in tests.
+- [x] TASK-007: `src/app/sender.py` — send a category-tagged SMS. Must pass the body through `sms_text.to_gsm7()`.
+  - Acceptance: a send failure for one category doesn't block the others; the outbound call is mocked in tests.
+  - Notes: **Twilio was dropped before any of it was committed** — its Turkey guidelines prohibit P2P traffic (exactly this use case) and demand a registered alphanumeric sender id with corporate documents; NetGSM has the same registration problem. Replaced by a **MacroDroid webhook**: one HTTP GET per category to the owner's phone, which sends the SMS from its own SIM. That removed the `twilio` dependency again (`requests` covers it) and replaced `load_twilio_settings()` with `load_macrodroid_settings()` — the trigger URL *is* the credential, so it lives in `.env`, and only the exception type is ever logged because `requests` quotes the failing URL in its message. **Three things about MacroDroid are not visible from this repo and are easy to get wrong** (verified against the MacroDroid wiki, not assumed): a query parameter only populates a variable that *already exists* on the phone, matched by exact case — a name mismatch sends an empty body and still returns 200; the macro must reference it as `{v=message}`, not `{message}`; and the recipient number stays in the macro, which also keeps a real phone number out of the repo. The URL is built by hand rather than with `requests`' `params=`, which encodes a space as `+` where MacroDroid documents `%20` and says nothing about `+`. Biggest consequence: **`200 ok` only means the relay queued a push** — a phone that is off, offline or out of credit answers identically — so the result type reports `accepted`, deliberately not `delivered`, and TASK-013's failure logging cannot cover the last hop. See `docs/adr/0006`.
 - [ ] TASK-008: Update `main.py` with a `--dry-run` flag — default behavior sends real SMS via `sender.py`; `--dry-run` reuses the Phase 1 terminal-print path instead.
+  - Note: `sender.send_report()` takes `(heading, body)` tuples rather than `main.Section`, so `main.py` depends on `sender.py` and not the reverse. Converting is TASK-008's job.
 
 ## Phase 3 — Lambda Orchestration
 - [ ] TASK-009: `src/app/lambda_handler.py` — thin wrapper that calls into `main.py`'s logic from an AWS Lambda handler.
 
 ## Phase 4 — AWS Deployment
 - [ ] TASK-010: Lambda packaging script or AWS SAM/CDK template (dependencies + code).
-- [ ] TASK-011: EventBridge cron rule (daily 08:00 Istanbul time, expressed as UTC cron).
+- [ ] TASK-011: EventBridge cron rule — `cron(0 3 * * ? *)`, i.e. daily 06:00 Istanbul expressed as 03:00 UTC.
 - [ ] TASK-012: Docs + deploy script for Secrets Manager / Lambda env vars.
 
 ## Phase 5 — Hardening
@@ -51,5 +53,5 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
 
 ## Open Decisions
 - [ ] Real portfolio symbol list (`config/portfolio.json` — gitignored, real holdings)
-- [ ] SMS send time for Phase 2 (default assumption: 08:00 Istanbul time)
-- [ ] SMS category order for Phase 2 (default assumption: markets → portfolio → news → sports)
+- [x] SMS send time: **06:00 Istanbul**, i.e. `03:00 UTC`. Türkiye has been on a fixed UTC+3 since 2016 with no daylight saving, so a plain UTC cron holds all year and the rule needs no seasonal adjustment.
+- [x] SMS category order: markets → portfolio → news → sports (the original default, confirmed).

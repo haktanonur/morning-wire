@@ -21,3 +21,5 @@ Cost falls to about 11 segments a day, roughly 330 a month — a ~60% cut, of wh
 The reader gets "Ortadogu'daki gerilim" instead of "Ortadoğu'daki gerilim". Turkish is readable this way and the habit predates smartphones, but it is a genuine loss and was accepted deliberately rather than by omission.
 
 `to_gsm7` must stay exhaustive. It is a silent optimization: a single unfolded character does not raise or warn, it just doubles the bill. A test asserts that the folded output contains nothing outside GSM-7.
+
+**Update:** ADR 0006 replaced Twilio with a MacroDroid webhook, so the segments now come out of the owner's own mobile plan rather than a Twilio invoice. The fold stays — Turkish would still push the phone into UCS-2, and an ASCII-only body survives a URL query parameter with nothing left to misencode — but the cost argument above no longer applies, which makes going back to full Turkish an affordable option rather than an expensive one.

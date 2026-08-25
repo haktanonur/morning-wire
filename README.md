@@ -1,6 +1,6 @@
 # Daily Brief Bot
 
-A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API, and (in the current phase) prints the result to the terminal. A later phase adds SMS delivery via Twilio and AWS Lambda deployment.
+A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API, and (in the current phase) prints the result to the terminal. A later phase adds SMS delivery via a MacroDroid webhook on the owner's own phone, and AWS Lambda deployment.
 
 ## Read First
 - [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md) — rules every coding agent must follow in this repo, plus the Agent Loop
@@ -28,7 +28,7 @@ Then create a gitignored `.env` in the repo root with the keys below. `src/app/c
 | `ANTHROPIC_API_KEY` | `summarizer.py` | 1 |
 | `FINNHUB_API_KEY` | `fetchers/market_news.py` | 1 |
 | `FOOTBALL_DATA_API_KEY` | `fetchers/sports.py` — free key from football-data.org | 1 |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_TO_NUMBER` | `sender.py` | 2 |
+| `MACRODROID_TRIGGER_URL` | `sender.py` — the webhook URL of the SMS macro on your phone | 2 |
 
 `fetchers/portfolio.py` (yfinance) needs no key.
 
