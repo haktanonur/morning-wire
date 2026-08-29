@@ -13,9 +13,9 @@ Each row runs in its own try/except block; `main.py` collects the results and pr
 
 ## Phase 2+ Component Diagram
 ```
-EventBridge (cron(0 3 * * ? *) — 06:00 Istanbul, 03:00 UTC)
+GitHub Actions schedule (cron: "0 3 * * *" — 06:00 Istanbul, 03:00 UTC)
         |
-AWS Lambda (lambda_handler.py -> main.py)
+python -m app.main   (no wrapper; the CLI is the entry point)
         |
         +--> [same 4 fetcher/summarizer pairs as Phase 1]
         |
@@ -38,9 +38,10 @@ The webhook is a relay, so the arrow out of `sender.py` stops at "queued": a
 | `fetchers/sports.py` | football league results | football-data.org | 1 |
 | `summarizer.py` | turn raw data into a short Turkish summary | Anthropic Claude API | 1 |
 | `sms_text.py` | fold Turkish letters into GSM-7 so a segment holds 153 chars, not 67 | none | 2 |
-| `main.py` | orchestration, error isolation, terminal output (Phase 1) / dry-run CLI (Phase 2) | all of the above | 1–2 |
+| `main.py` | orchestration, error isolation, terminal output, `--dry-run`, exit code | all of the above | 1–2 |
 | `sender.py` | SMS delivery | MacroDroid webhook (owner's phone) | 2 |
-| `lambda_handler.py` | wraps `main.py` for AWS Lambda | AWS Lambda runtime | 3 |
+
+There is no `lambda_handler.py` row any more: `docs/adr/0007` replaced Lambda with a scheduled GitHub Actions workflow, which runs `main.py` directly.
 
 ## Data Flow (Single Category, Phase 1)
 1. `main.py` calls the relevant fetcher → returns raw data (dict/list)

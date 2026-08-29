@@ -11,3 +11,5 @@ Python 3.12 is used. Rationale: libraries like yfinance exist ready-made, less b
 
 ## Consequences
 A small learning-curve cost for the project owner (less daily fluency than Java), offset by faster overall development speed and easier maintenance for this kind of task.
+
+**Update:** the cold-start argument above is void — ADR 0007 dropped Lambda for a scheduled GitHub Actions run, where startup time does not matter. The decision is unaffected; yfinance alone would have carried it.

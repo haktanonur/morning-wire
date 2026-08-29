@@ -1,6 +1,6 @@
 # Daily Brief Bot
 
-A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API, and (in the current phase) prints the result to the terminal. A later phase adds SMS delivery via a MacroDroid webhook on the owner's own phone, and AWS Lambda deployment.
+A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. The remaining phase schedules that run every morning as a GitHub Actions workflow.
 
 ## Read First
 - [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md) — rules every coding agent must follow in this repo, plus the Agent Loop
@@ -9,8 +9,8 @@ A personal daily-briefing tool. Fetches data for 4 categories — global markets
 - [`docs/architecture.md`](./docs/architecture.md) — component diagram
 - [`docs/data-sources.md`](./docs/data-sources.md) — APIs used and their limits
 
-## Current Milestone: Phase 1
-Fetch + summarize + print to terminal. No SMS, no AWS yet. See `TASKS.md` for the exact task list.
+## Current Milestone: Phase 3
+Phase 1 (fetch + summarize + terminal output) and Phase 2 (SMS delivery) are done, so the brief works when run by hand. Phase 3 is scheduling it: a single GitHub Actions workflow at 03:00 UTC. There is no AWS in this project — see [`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md). `TASKS.md` has the exact task list.
 
 ## Local Setup
 ```bash
@@ -53,6 +53,6 @@ Open this repo in Claude Code and start with:
 
 > Read CLAUDE.md and AGENTS.md in full before doing anything else. Then read PLAN.md and TASKS.md to understand the project.
 >
-> Start with TASK-001 from TASKS.md. Follow the Agent Loop defined in AGENTS.md exactly: explore, plan, implement, test, run static checks, self-review, update TASKS.md — then stop and show me the diff before committing. I want to review each task before you move to the next one.
+> Take the next unchecked task in TASKS.md. Follow the Agent Loop defined in AGENTS.md exactly: explore, plan, implement, test, run static checks, self-review, update TASKS.md — then stop and show me the diff before committing. I want to review each task before you move to the next one.
 >
-> Do not skip ahead to later tasks or phases. Do not touch Twilio, AWS, or Lambda code yet — Phase 1 is fetch + summarize + terminal output only.
+> Do not skip ahead to later tasks or phases. Read the ADRs under docs/adr/ before proposing anything about SMS delivery or deployment — several obvious-looking options were tried and rejected there for reasons that are not visible from the code.
