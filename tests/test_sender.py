@@ -13,7 +13,8 @@ from app.sender import (
     build_url,
     send_report,
 )
-from app.sms_text import GSM7_BASIC, GSM7_EXTENSION
+from app.sms_text import CONCATENATED_SEGMENT_UNITS, GSM7_BASIC, GSM7_EXTENSION
+from app.summarizer import MAX_SUMMARY_CHARS
 
 TRIGGER_URL = "https://trigger.macrodroid.com/fake-device-id/daily-sms-bot"
 
@@ -52,6 +53,19 @@ def test_build_message_folds_turkish_into_gsm7() -> None:
 
     assert "Portfoy gunu artida kapatti - sirket hissesi yukseldi." in body
     assert all(char in GSM7_BASIC or char in GSM7_EXTENSION for char in body)
+
+
+def test_a_capped_summary_plus_the_longest_tag_fits_four_segments() -> None:
+    """summarizer.MAX_SUMMARY_CHARS is segment arithmetic, so make the arithmetic executable.
+
+    It was got wrong once by counting the tag's brackets as one unit each when
+    they are escape pairs costing two. Nothing at runtime notices an overspill —
+    the message just quietly takes an extra segment — so it is asserted here.
+    """
+    tags = [build_message(heading, "") for heading, _ in SECTIONS]
+    units = max(sum(2 if char in GSM7_EXTENSION else 1 for char in tag) for tag in tags)
+
+    assert MAX_SUMMARY_CHARS + units <= 4 * CONCATENATED_SEGMENT_UNITS
 
 
 def test_build_message_keeps_the_unavailable_marker_readable() -> None:

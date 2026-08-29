@@ -28,9 +28,18 @@ GSM7_BASIC = frozenset(
 )
 
 # The extension table. Still GSM-7, but each character costs two units because
-# it is sent as an escape pair. ``[`` and ``]`` matter here: main.py renders a
-# failed category as "[unavailable: ...]".
+# it is sent as an escape pair. ``[`` and ``]`` matter here twice over: main.py
+# renders a failed category as "[unavailable: ...]", and sender.py wraps every
+# category tag in them, so "[PORTFOLIO] " is 12 characters but 14 units.
 GSM7_EXTENSION = frozenset("^{}\\[~]|€")
+
+# Units in one segment of a multi-segment GSM-7 message. A standalone message
+# holds 160, but the 6-byte header that lets a long message be reassembled eats
+# seven of them, and every message here is long enough to be concatenated.
+# Everything downstream is derived from this number, so it lives next to the
+# alphabet rather than in a comment: summarizer.MAX_SUMMARY_CHARS is sized to it
+# and a test in tests/test_sender.py asserts the two still agree.
+CONCATENATED_SEGMENT_UNITS = 153
 
 # NFD decomposition turns ç, ğ, ö, ş, ü and the accented Latin letters into a
 # base letter plus a combining mark, so stripping the marks is enough for them.
