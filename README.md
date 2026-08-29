@@ -48,6 +48,25 @@ Both fetch all 4 categories, summarize each, and print the result to the termina
 
 Sending is the default because the scheduled run passes no arguments; `--dry-run` is the developer's flag, and it needs no `MACRODROID_TRIGGER_URL`. A send run exits `1` if any category failed to reach the relay — that exit code is the only failure signal the scheduled job has.
 
+## The Scheduled Run
+`.github/workflows/daily-brief.yml` runs the brief every day at 03:00 UTC (06:00 Istanbul) and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
+
+It needs five repository secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | as in `.env` |
+| `FINNHUB_API_KEY` | as in `.env` |
+| `FOOTBALL_DATA_API_KEY` | as in `.env` |
+| `MACRODROID_TRIGGER_URL` | as in `.env` |
+| `PORTFOLIO_JSON` | the **contents** of `config/portfolio.json` |
+
+`PORTFOLIO_JSON` is the one that is easy to miss: the real portfolio file is gitignored, so it is not in the runner's checkout and the workflow writes it back from this secret. Without it the portfolio section reads `[unavailable: ...]` every morning while everything else looks fine.
+
+Run it by hand from the Actions tab — "Run workflow", with **Run the pipeline but send no SMS** ticked for a dry run. That is the only way to test it: scheduled workflows only ever run on the default branch, so a change to this file proves nothing until it is on `main`.
+
+Two things to know when it misbehaves. GitHub's schedule is best-effort and can be delayed or, under load, skipped — a brief that arrives late is normal, one that never arrives is worth checking. And GitHub disables scheduled workflows in a repository with no activity for 60 days, so if the runs stop entirely, look at the Actions tab before the code.
+
 ## Getting Started With Claude Code
 Open this repo in Claude Code and start with:
 
