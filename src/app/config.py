@@ -16,7 +16,8 @@ from dotenv import load_dotenv
 # Load the developer's .env on import so every caller sees the same environment.
 # Explicit path rather than a CWD-relative search, so `python -m app.main` behaves
 # the same regardless of the directory it was launched from. Existing environment
-# variables win over the file, which keeps CI and Lambda (Phase 3) overrides working.
+# variables win over the file, which is what lets the GitHub Actions run (Phase 3)
+# supply these from repository secrets with no .env present at all.
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_ENV_FILE, override=False)
 

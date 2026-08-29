@@ -3,7 +3,7 @@
 Any coding agent (Claude Code, Cursor, Copilot Workspace, etc.) working in this repo MUST read this file before making any change. These rules are binding unless they directly conflict with an explicit instruction from the human developer in the current session.
 
 ## What This Project Is
-A personal daily-briefing system. Currently in **Phase 1**: fetch data for 4 categories (global markets, personal portfolio, TR + global news, sports), summarize each with the Claude API, and print the result to the terminal. No SMS, no AWS yet — those come in later phases. See `PLAN.md` for the full roadmap and `TASKS.md` for the task backlog.
+A personal daily-briefing system: fetch data for 4 categories (global markets, personal portfolio, TR + global news, sports), summarize each with the Claude API in Turkish, and send one SMS per category to the owner's phone through a MacroDroid webhook. Phases 1 (fetch/summarize/print) and 2 (SMS) are done; **Phase 3** schedules the daily run as a GitHub Actions workflow. There is no AWS in this project — `docs/adr/0007` replaced the Lambda plan. See `PLAN.md` for the roadmap and `TASKS.md` for the backlog.
 
 ## Tech Stack
 - Python 3.12+
@@ -12,7 +12,7 @@ A personal daily-briefing system. Currently in **Phase 1**: fetch data for 4 cat
 - pytest + pytest-mock + responses (testing)
 - ruff (lint + format), mypy (static type checking)
 - pre-commit (pre-commit hooks)
-- (Phase 2+) MacroDroid webhook for SMS, AWS Lambda + EventBridge for deployment
+- MacroDroid webhook for SMS delivery (Phase 2), scheduled GitHub Actions for the daily run (Phase 3)
 
 ## Repository Structure
 ```
@@ -20,13 +20,13 @@ src/app/
   config.py            # single entry point for reading env vars
   fetchers/             # one isolated module per data source
   summarizer.py          # Claude API calls
-  main.py                 # Phase 1: CLI entrypoint, prints summaries to terminal
-  sender.py               # (Phase 2) SMS delivery via a MacroDroid webhook
-  lambda_handler.py       # (Phase 3) wraps main.py logic for AWS Lambda
-tests/                    # mirrors src/app structure 1:1
+  main.py                 # CLI entrypoint: prints the report, sends unless --dry-run
+  sender.py               # SMS delivery via a MacroDroid webhook
+tests/                    # mirrors src/app structure 1:1, plus conftest.py guards
 config/portfolio.example.json   # example symbol list (real list is gitignored)
 docs/                      # architecture, data sources, ADRs
 .github/workflows/ci.yml   # lint + type check + test pipeline
+.github/workflows/daily-brief.yml   # (Phase 3) the scheduled 03:00 UTC run
 ```
 
 ## Coding Rules
@@ -39,7 +39,7 @@ docs/                      # architecture, data sources, ADRs
 
 ## Testing Standards
 - Every new module needs a matching test file under `tests/` with the same name.
-- External API calls must never hit the real network in tests — mock with `pytest-mock` / `responses`.
+- External API calls must never hit the real network in tests — mock with `pytest-mock` / `responses`. `tests/conftest.py` enforces both halves of this: it clears every real credential and blocks outbound sockets, so a test that forgets cannot quietly run against the developer's `.env`.
 - Minimum coverage target: 80% (enforced in CI via `--cov-fail-under=80`).
 - Test naming: `test_<function>_<scenario>` (e.g. `test_fetch_portfolio_prices_handles_missing_symbol`).
 - Prefer writing the test before the implementation (TDD) where practical.

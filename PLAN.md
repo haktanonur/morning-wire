@@ -7,7 +7,7 @@ Every morning, without manually scanning the news, get a personalized summary ac
 3. Turkey and global current events (politics/news)
 4. Sports: TR Super Lig, La Liga, Premier League, Serie A, NBA, F1 (as implemented: Premier League, La Liga, Serie A only — see §4)
 
-**Current milestone (Phase 1):** fetch + summarize + print to the terminal. SMS delivery and cloud deployment are deliberately deferred to later phases so the core data/summarization logic can be built and reviewed first, without the added complexity of SMS delivery and AWS.
+**Current milestone (Phase 3):** scheduling the daily run. Phase 1 (fetch + summarize + terminal output) and Phase 2 (SMS delivery) are done — the brief is sent by running `python -m app.main` by hand, and what remains is doing that every morning without being asked. Building the phases in that order was deliberate: the data and summarization logic was reviewed on its own before delivery or scheduling were in the way.
 
 ## 2. Out of Scope (Deliberate Decisions)
 - No real-time/instant alerts — once a day
@@ -35,9 +35,9 @@ Each category runs in its own try/except block — one failing fetcher does not 
 
 ### Phase 2+ (later)
 ```
-EventBridge (cron(0 3 * * ? *) — 06:00 Istanbul, 03:00 UTC)
+GitHub Actions schedule (cron: "0 3 * * *" — 06:00 Istanbul, 03:00 UTC)
         |
-AWS Lambda (lambda_handler.py -> main.py)
+python -m app.main   (no wrapper; the CLI is the entry point)
         |
    [same 4 fetchers + summarizer as Phase 1]
         |
@@ -46,6 +46,8 @@ AWS Lambda (lambda_handler.py -> main.py)
 ```
 
 Türkiye dropped daylight saving in 2016 and sits on UTC+3 all year, so the cron is a fixed UTC expression with no seasonal correction.
+
+The scheduler was **EventBridge + Lambda** until `docs/adr/0007`: the repo already ran GitHub Actions on every push, so scheduling there costs a `on: schedule` block instead of a handler, a dependency bundle, an IAM role and an AWS account. The trade is that GitHub's schedule is best-effort — it can be delayed at the top of the hour and, under enough load, dropped — where EventBridge's was not.
 
 ## 4. Category Design
 
@@ -104,40 +106,42 @@ If a category fails, its section prints `[unavailable: <short reason>]` instead 
 
 The trade is that **delivery is no longer observable**. The webhook is a cloud relay: it answers `200 ok` once it has queued a push to the phone, and answers identically when the phone is off, offline or out of credit. `SendOutcome.accepted` means the relay took it, not that the message arrived, and §9's error handling cannot cover that last hop.
 
-## 8. Phase 3+ — AWS Infrastructure
-| Component | Service | Why |
+## 8. Phase 3 — Scheduled Deployment (GitHub Actions)
+| Component | Mechanism | Why |
 |---|---|---|
-| Scheduling | EventBridge (cron rule) | Free, no server to manage |
-| Execution | Lambda (Python 3.12) | Free tier far exceeds daily needs |
-| Secrets | Lambda environment variables | Keys never live in code |
-| Logging | CloudWatch Logs | See which category failed and why |
+| Scheduling | `on: schedule` in `.github/workflows/daily-brief.yml` | Already in the repo; no second platform |
+| Execution | `python -m app.main` on an `ubuntu-latest` runner | Same install line CI already runs |
+| Secrets | GitHub Actions secrets → environment variables | Keys never live in code |
+| Logging | The workflow run log | Only stderr; stdout is discarded so the briefing is not written into it |
+| Failure alert | GitHub's email on a failed scheduled run | The job fails silently otherwise; this is why the run exits non-zero |
 
-Rationale details in `docs/adr/0003-aws-lambda-serverless.md`.
+**AWS was the plan until `docs/adr/0007-github-actions-over-aws-lambda.md` replaced it**, which supersedes `docs/adr/0003-aws-lambda-serverless.md` and deleted four backlog tasks (Lambda handler, packaging, EventBridge, Secrets Manager). No `lambda_handler.py` is needed: `main.py` is already the entry point.
+
+Two caveats worth remembering: a scheduled workflow only ever runs on the **default branch**, so it cannot be tested from a task branch — hence the `workflow_dispatch` trigger — and GitHub disables scheduled workflows in a repository that has seen no activity for 60 days.
 
 ## 9. Error Handling Strategy
 - Each category runs in its own try/except block
-- If a data source is unreachable, that category's output becomes "data unavailable" — the rest of the run continues
-- Once CloudWatch is in place (Phase 3+), failures are logged there
-- A failed SMS send (Phase 2+) doesn't block the next day's run
+- If a data source is unreachable, that category's output becomes "data unavailable" — the rest of the run continues, and the SMS still goes out saying so
+- Failures land in the GitHub Actions run log (Phase 3), which is why only stderr survives into it
+- A failed SMS send doesn't block the other categories or the next day's run, but it does make the run exit non-zero so the scheduled job goes red and GitHub emails about it — otherwise a silent phone is indistinguishable from a quiet news day
 
 ## 10. Development Phases
 Full task breakdown in `TASKS.md`. Summary:
 1. Phase 0 — Skeleton (done: this file set + example `config.py`)
-2. **Phase 1 — Fetch + summarize + terminal output (current focus)**
-3. Phase 2 — SMS delivery (MacroDroid webhook)
-4. Phase 3 — Lambda orchestration wrapper
-5. Phase 4 — AWS deployment (IaC, EventBridge)
-6. Phase 5 — Hardening (logging, integration test, docs)
+2. Phase 1 — Fetch + summarize + terminal output (done)
+3. Phase 2 — SMS delivery via the MacroDroid webhook (done)
+4. **Phase 3 — Scheduled deployment: one GitHub Actions workflow (current focus)**
+5. Phase 4 — Hardening (log format, integration test, docs)
 
 ## 11. Accounts / API Keys Needed
 - Anthropic API key (needed starting Phase 1)
 - Finnhub free-tier key (Phase 1) — Alpha Vantage remains an unimplemented fallback
 - football-data.org free-tier key (Phase 1)
 - MacroDroid on an Android phone, with a webhook macro and its trigger URL (Phase 2) — no account approval needed, unlike the Twilio/NetGSM routes this replaced
-- AWS account, free tier (Phase 3+)
+- No cloud account. The GitHub account that already hosts the repo is the whole of Phase 3 (`docs/adr/0007`); the AWS free-tier account this list used to require is not needed.
 
 ## 12. Open Decisions
 See the "Open Decisions" section at the end of `TASKS.md` (real portfolio symbol list, SMS send time, SMS category order for Phase 2).
 
 ## 13. Architecture Decisions (ADR)
-Rationale for choosing Python, AWS Lambda, per-category SMS, etc. is recorded under `docs/adr/`.
+Rationale for choosing Python, MacroDroid over Twilio, GitHub Actions over AWS Lambda, per-category SMS, etc. is recorded under `docs/adr/`. Two of them are supersessions (0006 over Twilio, 0007 over 0003) — read the superseding ADR before reopening either question.

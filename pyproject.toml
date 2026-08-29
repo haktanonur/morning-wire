@@ -12,8 +12,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Added in Phase 3+: "boto3>=1.34". Phase 2's SMS delivery needs no new dependency:
-# it is one HTTP call to a MacroDroid webhook, so `requests` already covers it.
+# The runtime dependency list above is final. Phase 2's SMS delivery is one HTTP
+# call to a MacroDroid webhook, which `requests` already covers, and the boto3
+# that Phase 3 used to reserve is not needed either: the daily run is a scheduled
+# GitHub Actions workflow rather than a Lambda (docs/adr/0007).
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",

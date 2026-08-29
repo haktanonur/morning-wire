@@ -43,21 +43,20 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - Note: `sender.send_report()` takes `(heading, body)` tuples rather than `main.Section`, so `main.py` depends on `sender.py` and not the reverse. Converting is TASK-008's job.
   - Notes: the report is printed in **both** modes and printed *before* sending, so a delivery failure still leaves the briefing readable — sending is an extra step on the Phase 1 path rather than a branch away from it. `main()` now returns an exit code and **`__main__` calls `sys.exit(main())`**: without it a scheduled run whose SMS all failed would still go green, and the relay's failures are otherwise invisible. A category that failed to build is still sent, as `[unavailable: ...]` — the reader is owed the fact that a source died. The delivery summary says "accepted", never "delivered", for the reason in `docs/adr/0006`, and it names the refused categories without their error strings, which is what keeps the trigger URL out of stdout. `--dry-run` deliberately does not touch `load_macrodroid_settings()`, so the Phase 1 path still runs on a machine with no `.env` SMS entry at all; a test asserts that by omitting the send fixture.
 
-## Phase 3 — Lambda Orchestration
-- [ ] TASK-009: `src/app/lambda_handler.py` — thin wrapper that calls into `main.py`'s logic from an AWS Lambda handler.
+## Phase 3 — Scheduled Deployment (GitHub Actions)
+**TASK-009 through TASK-012 were deleted, not deferred.** They were the AWS route — a `lambda_handler.py` wrapper, a dependency bundle, an EventBridge rule and a Secrets Manager deploy script — and `docs/adr/0007` replaced all four with a scheduled workflow in a repository that already runs GitHub Actions. `src/app/lambda_handler.py` will not be written: `main.py` is already the entry point, and the wrapper existed only to satisfy Lambda's calling convention. The numbers are left unused rather than recycled so the notes above still refer to something.
 
-## Phase 4 — AWS Deployment
-- [ ] TASK-010: Lambda packaging script or AWS SAM/CDK template (dependencies + code).
-- [ ] TASK-011: EventBridge cron rule — `cron(0 3 * * ? *)`, i.e. daily 06:00 Istanbul expressed as 03:00 UTC.
-- [ ] TASK-012: Docs + deploy script for Secrets Manager / Lambda env vars.
+- [ ] TASK-019: `.github/workflows/daily-brief.yml` — scheduled workflow running `python -m app.main` at `0 3 * * *` (06:00 Istanbul), with the four secrets from GitHub Actions secrets and a `workflow_dispatch` trigger for manual runs.
+  - Acceptance: a manual dispatch delivers the four SMS; a failed send turns the run red.
 
-## Phase 5 — Hardening
+## Phase 4 — Hardening
 - [x] TASK-018: `tests/conftest.py` — autouse guards so no test can read the developer's real credentials or open a real connection.
   - Acceptance: a test that sets no environment variable of its own gets `MissingEnvVarError`, not the real key; an unmocked HTTP call raises instead of going out.
   - Notes: `config.py` calls `load_dotenv()` at import, so every test already had the real `.env` in reach and only convention kept it unused — the failure mode is a test that passes locally against live credentials, spends real quota or fires a real SMS, then fails in CI where no `.env` exists. It had happened once already: the `runpy` test removed in TASK-006 silently hit the real network for 4.2s. The guarded variable list is checked against `config.py`'s own source with `ast` rather than kept in sync by hand, so a newly added secret cannot quietly fall outside the guard. The network block patches `socket.connect`/`create_connection`, which sits below `responses` and `pytest-mock` and so leaves every properly mocked test alone. The whole suite passed unchanged, which says the convention was being followed — the point is that it is no longer a convention.
-- [ ] TASK-013: Standardize CloudWatch log format (which category, how long it took, success/failure).
+- [ ] TASK-013: Standardize the run log format (which category, how long it took, success/failure) so the workflow log is readable at a glance.
+  - Note: was "CloudWatch log format" — the destination is now the GitHub Actions run log (`docs/adr/0007`), but the content question is unchanged. Only stderr survives into that log; TASK-019 discards stdout so the briefing is not written into it.
 - [ ] TASK-014: End-to-end dry-run integration test covering the full pipeline.
-- [ ] TASK-015: Update README with deployment steps.
+- [ ] TASK-015: Update README with deployment steps (GitHub Actions secrets + the phone-side macro, not AWS).
 
 ## Open Decisions
 - [x] Real portfolio symbol list: added by the owner to `config/portfolio.json` (gitignored, so the holdings stay out of the repo).

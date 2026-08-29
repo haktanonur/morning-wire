@@ -1,7 +1,7 @@
 # 3. AWS Lambda Instead of a Server
 
 ## Status
-Accepted
+Superseded by [ADR 0007](0007-github-actions-over-aws-lambda.md), which schedules the run with GitHub Actions instead. The premise below — that a once-daily job should not have a server under it — survived; the conclusion did not, because the repository already had a free scheduler in it.
 
 ## Context
 The system runs once a day for a short time. An always-on server (VPS, Raspberry Pi) would add unnecessary maintenance overhead and cost.
