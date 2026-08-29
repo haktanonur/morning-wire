@@ -1,0 +1,88 @@
+name: Daily Brief
+
+# The deployment, in full. There is no server, no Lambda and no AWS account
+# behind this: docs/adr/0007-github-actions-over-aws-lambda.md explains why the
+# scheduler the repo already had won over the one that needed four more tasks.
+on:
+  # 03:00 UTC = 06:00 Istanbul. Türkiye has been on a fixed UTC+3 since 2016, so
+  # a plain UTC cron holds all year with no seasonal correction.
+  #
+  # GitHub documents this trigger as best-effort: it can be delayed under load,
+  # and heavily queued jobs can be dropped outright. The top of the hour is the
+  # worst case, which is exactly where this sits — an accepted trade for a
+  # personal brief. If mornings start going missing, shifting to "7 3 * * *" is
+  # the cheap first thing to try.
+  schedule:
+    - cron: "0 3 * * *"
+
+  # A scheduled workflow only ever runs on the default branch, so this file
+  # cannot be tested by pushing a task branch. Manual dispatch is the only way
+  # to exercise it, and the dry_run input makes that possible without spending
+  # four real SMS.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run the pipeline but send no SMS"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    # The whole run is four HTTP fetches, four Claude calls and four webhooks.
+    # If it is still going after ten minutes something is hanging, and a hung
+    # job holds the runner until GitHub's own six-hour limit.
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Runtime dependencies only — the dev extras are for CI, which is a
+      # separate workflow.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      # config/portfolio.json holds real holdings and is gitignored, so it is
+      # not in the checkout. Without it the portfolio category would come out as
+      # "[unavailable: ...]" every morning. It arrives as a secret instead, and
+      # is written through the environment rather than interpolated into the
+      # script, so its contents cannot be read as shell.
+      - name: Restore the portfolio config
+        env:
+          PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
+        run: printf '%s' "$PORTFOLIO_JSON" > config/portfolio.json
+
+      # stdout carries the whole briefing, portfolio included, and workflow logs
+      # are visible to anyone if a repository is ever made public. The SMS is
+      # the output; the log only needs stderr, which is the warnings and the
+      # one-line delivery summary.
+      #
+      # The step fails when main.py exits non-zero, which it does when any
+      # category failed to reach the relay. That red run — and the mail GitHub
+      # sends about it — is the only way a silent morning gets noticed.
+      - name: Send the briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+          MACRODROID_TRIGGER_URL: ${{ secrets.MACRODROID_TRIGGER_URL }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # Compared against "true" rather than tested for emptiness: a
+          # dispatch with the box unticked sets DRY_RUN to the *string* "false",
+          # which is not empty and would otherwise suppress every send.
+          if [ "$DRY_RUN" = "true" ]; then
+            python -m app.main --dry-run > /dev/null
+          else
+            python -m app.main > /dev/null
+          fi
