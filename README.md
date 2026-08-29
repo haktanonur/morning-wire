@@ -39,11 +39,14 @@ ruff check .
 mypy src
 ```
 
-## Running Locally (Phase 1)
+## Running Locally
 ```bash
-python -m app.main
+python -m app.main --dry-run   # print the briefing, send nothing
+python -m app.main             # print it and send one SMS per category
 ```
-This fetches all 4 categories, summarizes each, and prints the result to the terminal. Each category is isolated — if one fails, the others still print.
+Both fetch all 4 categories, summarize each, and print the result to the terminal. Each category is isolated — if one fails, the others still print, and the failure is sent as `[unavailable: ...]` rather than silently dropped.
+
+Sending is the default because the scheduled run passes no arguments; `--dry-run` is the developer's flag, and it needs no `MACRODROID_TRIGGER_URL`. A send run exits `1` if any category failed to reach the relay — that exit code is the only failure signal the scheduled job has.
 
 ## Getting Started With Claude Code
 Open this repo in Claude Code and start with:
