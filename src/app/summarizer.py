@@ -28,17 +28,31 @@ logger = logging.getLogger(__name__)
 
 MODEL = "claude-haiku-4-5-20251001"
 
-# Phase 1 prints to a terminal, but Phase 2 has to fit these into SMS segments,
-# so the length is capped now rather than after the prompts are tuned.
+# The cap is a hard ceiling on what fits an SMS, and it is deliberately well
+# above the length the prompts ask for. Those are two different numbers doing
+# two different jobs, and collapsing them into one was a bug: the cap used to sit
+# at 400 exactly where SYSTEM_PROMPT asks for "under 400 characters", so any
+# overshoot at all lost a whole sentence to _trim. A live run had three of the
+# four categories trimmed (572, 490 and 430 characters against the 400 target),
+# and markets lost its entire closing sentence.
 #
-# 400 comes off the segment arithmetic rather than taste. Once sms_text.to_gsm7
-# has folded the Turkish letters, a concatenated segment carries 153 characters,
-# so three of them hold 459 — 400 keeps a category inside three segments with
-# room left for the tag sender.py (TASK-007) puts in front of it. Measured
-# against real feeds that is about 11 segments a day across the four categories,
-# against 28 for the same Turkish text left at 600 characters and unfolded.
+# 590 comes off the segment arithmetic. After sms_text.to_gsm7 has folded the
+# Turkish letters, four concatenated segments carry 4 * 153 = 612 units; the
+# longest tag sender.py prepends, "[PORTFOLIO] ", costs 14 of them because the
+# brackets are escape pairs. That leaves 598, rounded down for slack. The margin
+# over the prompt's 400 is roughly 1.5x, which covers the ~1.4x overshoot the
+# model was measured at, so _trim goes back to being a backstop that rarely
+# fires rather than a guillotine.
+#
+# Raising it is affordable because the SMS now leave the owner's own phone
+# (docs/adr/0006) rather than a metered Twilio account; under Twilio this cost
+# real money per segment, which is where the old 3-segment budget came from.
+MAX_SUMMARY_CHARS = 590
+
+# Room for the model to reach the cap without being cut off mid-word, which is
+# worse than a trim: Turkish runs about 0.46 output tokens per character, so 590
+# characters is roughly 270 tokens.
 MAX_TOKENS = 400
-MAX_SUMMARY_CHARS = 400
 
 NO_DATA = "Bugün için veri yok."
 
