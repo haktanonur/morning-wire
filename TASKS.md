@@ -50,11 +50,14 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
 - [ ] TASK-012: Docs + deploy script for Secrets Manager / Lambda env vars.
 
 ## Phase 5 — Hardening
+- [x] TASK-018: `tests/conftest.py` — autouse guards so no test can read the developer's real credentials or open a real connection.
+  - Acceptance: a test that sets no environment variable of its own gets `MissingEnvVarError`, not the real key; an unmocked HTTP call raises instead of going out.
+  - Notes: `config.py` calls `load_dotenv()` at import, so every test already had the real `.env` in reach and only convention kept it unused — the failure mode is a test that passes locally against live credentials, spends real quota or fires a real SMS, then fails in CI where no `.env` exists. It had happened once already: the `runpy` test removed in TASK-006 silently hit the real network for 4.2s. The guarded variable list is checked against `config.py`'s own source with `ast` rather than kept in sync by hand, so a newly added secret cannot quietly fall outside the guard. The network block patches `socket.connect`/`create_connection`, which sits below `responses` and `pytest-mock` and so leaves every properly mocked test alone. The whole suite passed unchanged, which says the convention was being followed — the point is that it is no longer a convention.
 - [ ] TASK-013: Standardize CloudWatch log format (which category, how long it took, success/failure).
 - [ ] TASK-014: End-to-end dry-run integration test covering the full pipeline.
 - [ ] TASK-015: Update README with deployment steps.
 
 ## Open Decisions
-- [ ] Real portfolio symbol list (`config/portfolio.json` — gitignored, real holdings)
+- [x] Real portfolio symbol list: added by the owner to `config/portfolio.json` (gitignored, so the holdings stay out of the repo).
 - [x] SMS send time: **06:00 Istanbul**, i.e. `03:00 UTC`. Türkiye has been on a fixed UTC+3 since 2016 with no daylight saving, so a plain UTC cron holds all year and the rule needs no seasonal adjustment.
 - [x] SMS category order: markets → portfolio → news → sports (the original default, confirmed).
