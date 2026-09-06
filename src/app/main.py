@@ -1,4 +1,10 @@
-"""CLI entrypoint: fetch, summarize, print and send all four categories.
+"""CLI entrypoint: fetch, summarize, print and send the whole briefing.
+
+Four categories are fetched and summarized — markets, portfolio, news, sports —
+and a fifth, the English vocabulary, is read straight off disk and sent
+unsummarized, because those entries are the owner's own study notes and the
+model has nothing to add to them.
+
 
 Run with ``python -m app.main`` to send the briefing as SMS, or
 ``python -m app.main --dry-run`` to print it and send nothing. Sending is the
@@ -30,6 +36,7 @@ from app.fetchers.general_news import fetch_general_news
 from app.fetchers.market_news import fetch_market_news
 from app.fetchers.portfolio import fetch_portfolio_prices, load_portfolio
 from app.fetchers.sports import fetch_sports
+from app.fetchers.vocabulary import WORDS_PER_DAY, daily_messages
 from app.sender import SendOutcome, send_report
 from app.summarizer import (
     summarize_markets,
@@ -78,6 +85,11 @@ CATEGORIES: tuple[tuple[str, Callable[[], str]], ...] = (
     ("SPORTS", _sports),
 )
 
+# Vocabulary goes last, after the four that are actually news. It is study
+# material rather than a briefing, and it is the part worth re-reading later in
+# the day rather than at 06:00.
+VOCABULARY_HEADING = "VOCAB"
+
 
 def build_section(heading: str, produce: Callable[[], str]) -> Section:
     """Run one category, converting any failure into an ``[unavailable: ...]`` body.
@@ -102,9 +114,42 @@ def build_section(heading: str, produce: Callable[[], str]) -> Section:
     return Section(heading=heading, body=body)
 
 
+def build_vocabulary_sections() -> list[Section]:
+    """Build the day's vocabulary as several numbered sections.
+
+    Kept out of :data:`CATEGORIES` because it is the one source that produces
+    more than one message. Splitting it inside a single failure boundary is
+    what keeps a missing notebook worth one ``[unavailable: ...]`` SMS instead
+    of three identical ones, and reads the file once for a list that has to be
+    consistent across all of them.
+    """
+    started = time.monotonic()
+    try:
+        bodies = daily_messages()
+    except Exception as exc:
+        logger.warning(
+            "%s failed in %.1fs.", VOCABULARY_HEADING, time.monotonic() - started, exc_info=True
+        )
+        reason = str(exc) or type(exc).__name__
+        return [Section(heading=VOCABULARY_HEADING, body=f"[unavailable: {reason}]")]
+
+    logger.info(
+        "%s ok in %.1fs, %d words over %d messages.",
+        VOCABULARY_HEADING,
+        time.monotonic() - started,
+        WORDS_PER_DAY,
+        len(bodies),
+    )
+    return [
+        Section(heading=f"{VOCABULARY_HEADING} {number}/{len(bodies)}", body=body)
+        for number, body in enumerate(bodies, start=1)
+    ]
+
+
 def build_report() -> list[Section]:
     """Fetch and summarize every category, isolating failures per section."""
-    return [build_section(heading, produce) for heading, produce in CATEGORIES]
+    sections = [build_section(heading, produce) for heading, produce in CATEGORIES]
+    return sections + build_vocabulary_sections()
 
 
 def render(sections: list[Section]) -> str:

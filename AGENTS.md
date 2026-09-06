@@ -3,7 +3,7 @@
 Any coding agent (Claude Code, Cursor, Copilot Workspace, etc.) working in this repo MUST read this file before making any change. These rules are binding unless they directly conflict with an explicit instruction from the human developer in the current session.
 
 ## What This Project Is
-A personal daily-briefing system: fetch data for 4 categories (global markets, personal portfolio, TR + global news, sports), summarize each with the Claude API in Turkish, and send one SMS per category to the owner's phone through a MacroDroid webhook. Phases 1 (fetch/summarize/print) and 2 (SMS) are done; **Phase 3** schedules the daily run as a GitHub Actions workflow. There is no AWS in this project — `docs/adr/0007` replaced the Lambda plan. See `PLAN.md` for the roadmap and `TASKS.md` for the backlog.
+A personal daily-briefing system: fetch data for 4 categories (global markets, personal portfolio, TR + global news, sports), summarize each with the Claude API in Turkish, and send one SMS per category to the owner's phone through a MacroDroid webhook. A fifth category, the day's English vocabulary, is read from `data/vocabulary.txt` and sent unsummarized — it is the one category the model never sees (`PLAN.md` §4). Phases 1 (fetch/summarize/print), 2 (SMS) and 3 (the scheduled GitHub Actions run) are done and delivering live; **Phase 4** is hardening. There is no AWS in this project — `docs/adr/0007` replaced the Lambda plan. See `PLAN.md` for the roadmap and `TASKS.md` for the backlog.
 
 ## Tech Stack
 - Python 3.12+
@@ -24,6 +24,7 @@ src/app/
   sender.py               # SMS delivery via a MacroDroid webhook
 tests/                    # mirrors src/app structure 1:1, plus conftest.py guards
 config/portfolio.example.json   # example symbol list (real list is gitignored)
+data/vocabulary.txt        # the owner's English notebook; committed, read at runtime
 docs/                      # architecture, data sources, ADRs
 .github/workflows/ci.yml   # lint + type check + test pipeline
 .github/workflows/daily-brief.yml   # (Phase 3) the scheduled 03:00 UTC run
@@ -33,7 +34,7 @@ docs/                      # architecture, data sources, ADRs
 1. Every function must have type hints (mypy strict mode is enforced).
 2. Every external API call lives in its own module under `src/app/fetchers/`, separated from business logic, so it can be mocked in tests.
 3. No module reads `.env` directly; the only entry point is `src/app/config.py`.
-4. **Per-category error isolation is mandatory**: if one category (e.g. the sports API) fails, the other 3 must not be affected. A failed category prints/sends "data unavailable" and the run continues.
+4. **Per-category error isolation is mandatory**: if one category (e.g. the sports API) fails, the others must not be affected. A failed category prints/sends "data unavailable" and the run continues.
 5. Think twice before adding a new dependency; when you do, explain why in the commit message.
 6. Every public function/class gets a short docstring (Google style).
 

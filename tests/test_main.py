@@ -24,35 +24,59 @@ CATEGORY_PATCHES = {
 }
 
 
+VOCABULARY_BODIES = ("first five words", "second five words", "third five words")
+
+VOCABULARY_HEADINGS = ["VOCAB 1/3", "VOCAB 2/3", "VOCAB 3/3"]
+
+
 @pytest.fixture(autouse=True)
 def _no_external_calls(mocker: MockerFixture) -> None:
-    """Mock every fetcher and summarizer so no test can reach the network."""
+    """Mock every fetcher and summarizer so no test can reach the network.
+
+    The vocabulary is stubbed too, even though it only reads a committed file:
+    these tests are about `main`'s wiring, and a real notebook read would tie
+    their expected output to whatever was last appended to it.
+    """
     for fetch_target, summarize_target in CATEGORY_PATCHES.values():
         mocker.patch(fetch_target, return_value=["raw"])
         mocker.patch(summarize_target, return_value="A tidy summary.")
     mocker.patch("app.main.fetch_portfolio_prices", return_value=["raw"])
+    mocker.patch("app.main.daily_messages", return_value=VOCABULARY_BODIES)
 
 
 @pytest.fixture
 def send(mocker: MockerFixture) -> MagicMock:
-    """Stub the SMS relay, accepting every category."""
+    """Stub the SMS relay, accepting every section."""
     return mocker.patch(
         "app.main.send_report",
-        return_value=tuple(SendOutcome(heading=heading) for heading in CATEGORY_PATCHES),
+        return_value=tuple(
+            SendOutcome(heading=heading) for heading in (*CATEGORY_PATCHES, *VOCABULARY_HEADINGS)
+        ),
     )
 
 
-def test_build_report_returns_all_four_categories_in_order() -> None:
+def test_build_report_returns_every_section_in_send_order() -> None:
+    """Vocabulary goes last, and arrives as several numbered messages."""
     assert [section.heading for section in build_report()] == [
         "MARKETS",
         "PORTFOLIO",
         "NEWS",
         "SPORTS",
+        *VOCABULARY_HEADINGS,
     ]
 
 
-def test_build_report_fills_every_section_with_its_summary() -> None:
-    assert all(section.body == "A tidy summary." for section in build_report())
+def test_build_report_fills_every_summarized_section_with_its_summary() -> None:
+    sections = {section.heading: section.body for section in build_report()}
+
+    assert [sections[heading] for heading in CATEGORY_PATCHES] == ["A tidy summary."] * 4
+
+
+def test_build_report_passes_the_vocabulary_through_unsummarized() -> None:
+    """The entries are the owner's own notes; there is nothing for the model to add."""
+    sections = {section.heading: section.body for section in build_report()}
+
+    assert [sections[heading] for heading in VOCABULARY_HEADINGS] == list(VOCABULARY_BODIES)
 
 
 @pytest.mark.parametrize("failing", sorted(CATEGORY_PATCHES))
@@ -62,9 +86,26 @@ def test_build_report_isolates_a_failing_fetcher(failing: str, mocker: MockerFix
     sections = {section.heading: section.body for section in build_report()}
 
     assert sections[failing] == "[unavailable: source is down]"
-    assert [body for heading, body in sections.items() if heading != failing] == [
+    assert [sections[heading] for heading in CATEGORY_PATCHES if heading != failing] == [
         "A tidy summary."
     ] * 3
+    assert [sections[heading] for heading in VOCABULARY_HEADINGS] == list(VOCABULARY_BODIES)
+
+
+def test_a_missing_notebook_costs_one_message_not_three(
+    mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    """One failure boundary for the whole category, so one SMS says so."""
+    mocker.patch("app.main.daily_messages", side_effect=RuntimeError("notebook is gone"))
+
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        sections = build_report()
+
+    assert [(section.heading, section.body) for section in sections][4:] == [
+        ("VOCAB", "[unavailable: notebook is gone]")
+    ]
+    assert [section.body for section in sections[:4]] == ["A tidy summary."] * 4
+    assert "VOCAB failed in " in caplog.text
 
 
 def test_build_report_isolates_a_failing_summarizer(mocker: MockerFixture) -> None:
@@ -106,14 +147,12 @@ def test_render_uses_the_plan_output_format() -> None:
     assert report == "=== MARKETS ===\nUp.\n\n=== SPORTS ===\nNothing."
 
 
-def test_main_prints_a_full_four_section_report(
-    send: MagicMock, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_main_prints_every_section(send: MagicMock, capsys: pytest.CaptureFixture[str]) -> None:
     """`main()` is exactly what `python -m app.main` runs, with everything mocked."""
     main([])
 
     printed = capsys.readouterr().out
-    for heading in CATEGORY_PATCHES:
+    for heading in (*CATEGORY_PATCHES, *VOCABULARY_HEADINGS):
         assert f"=== {heading} ===" in printed
     assert printed.count("A tidy summary.") == 4
 
@@ -126,7 +165,10 @@ def test_main_sends_every_section_by_default(send: MagicMock) -> None:
     assert main([]) == 0
 
     (sections,) = send.call_args.args
-    assert list(sections) == [(heading, "A tidy summary.") for heading in CATEGORY_PATCHES]
+    assert list(sections) == [
+        *((heading, "A tidy summary.") for heading in CATEGORY_PATCHES),
+        *zip(VOCABULARY_HEADINGS, VOCABULARY_BODIES, strict=True),
+    ]
 
 
 def test_main_sends_a_failed_category_as_its_unavailable_body(
@@ -147,7 +189,7 @@ def test_main_reports_the_delivery_outcome(
     with caplog.at_level(logging.INFO, logger="app.main"):
         main([])
 
-    assert "accepted all 4" in caplog.text
+    assert "accepted all 7" in caplog.text
 
 
 def test_main_exits_non_zero_when_a_category_does_not_reach_the_relay(send: MagicMock) -> None:
@@ -199,7 +241,8 @@ def test_each_category_logs_its_name_duration_and_length(
         build_report()
 
     assert [record.getMessage() for record in caplog.records] == [
-        f"{heading} ok in 0.0s, 15 chars." for heading in CATEGORY_PATCHES
+        *(f"{heading} ok in 0.0s, 15 chars." for heading in CATEGORY_PATCHES),
+        "VOCAB ok in 0.0s, 15 words over 3 messages.",
     ]
 
 
