@@ -167,7 +167,7 @@ def _extract_text(message: Any) -> str:
     ).strip()
 
 
-def _trim(summary: str) -> str:
+def _trim(category: str, summary: str) -> str:
     """Cap the summary at MAX_SUMMARY_CHARS, preferring a sentence boundary.
 
     The boundary is ``". "`` rather than ``"."`` so that a decimal point in a
@@ -177,12 +177,20 @@ def _trim(summary: str) -> str:
     logs when it fires because dropping the final sentence is invisible in the
     output: an overlong news summary once lost its world half here, and the
     missing half looked exactly like the model ignoring the prompt.
+
+    Args:
+        category: The heading this summary belongs to, named in the warning.
+            The first scheduled run logged a trim at 704 characters without
+            saying which of the four had been cut, which is most of what makes
+            such a warning actionable.
+        summary: The model's reply.
     """
     if len(summary) <= MAX_SUMMARY_CHARS:
         return summary
 
     logger.warning(
-        "Summary ran to %d characters, over the %d cap; trimming may drop its last sentence.",
+        "%s summary ran to %d characters, over the %d cap; trimming may drop its last sentence.",
+        category,
         len(summary),
         MAX_SUMMARY_CHARS,
     )
@@ -192,10 +200,11 @@ def _trim(summary: str) -> str:
     return summary[: cutoff + 1]
 
 
-def _summarize(prompt: str, data: str) -> str:
+def _summarize(category: str, prompt: str, data: str) -> str:
     """Send one category's prompt and data to Claude and return the summary text.
 
     Args:
+        category: The heading this summary belongs to, used only for logging.
         prompt: The category-specific instruction.
         data: The rendered fetcher output.
 
@@ -222,28 +231,28 @@ def _summarize(prompt: str, data: str) -> str:
     text = _extract_text(message)
     if not text:
         raise SummarizationError("Claude returned an empty summary")
-    return _trim(text)
+    return _trim(category, text)
 
 
 def summarize_markets(headlines: list[Headline]) -> str:
     """Summarize the economy and global markets category."""
     if not headlines:
         return NO_DATA
-    return _summarize(MARKETS_PROMPT, _format_headlines(headlines))
+    return _summarize("MARKETS", MARKETS_PROMPT, _format_headlines(headlines))
 
 
 def summarize_portfolio(quotes: list[PortfolioQuote]) -> str:
     """Summarize the portfolio category."""
     if not quotes:
         return NO_DATA
-    return _summarize(PORTFOLIO_PROMPT, _format_quotes(quotes))
+    return _summarize("PORTFOLIO", PORTFOLIO_PROMPT, _format_quotes(quotes))
 
 
 def summarize_news(articles: list[Article]) -> str:
     """Summarize the Turkey + world current events category."""
     if not articles:
         return NO_DATA
-    return _summarize(NEWS_PROMPT, _format_articles(articles))
+    return _summarize("NEWS", NEWS_PROMPT, _format_articles(articles))
 
 
 def summarize_sports(matches: tuple[MatchResult, ...]) -> str:
@@ -254,4 +263,4 @@ def summarize_sports(matches: tuple[MatchResult, ...]) -> str:
     """
     if not matches:
         return NOTHING_NOTABLE
-    return _summarize(SPORTS_PROMPT, _format_matches(matches))
+    return _summarize("SPORTS", SPORTS_PROMPT, _format_matches(matches))

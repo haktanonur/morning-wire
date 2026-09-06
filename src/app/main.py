@@ -9,6 +9,12 @@ Each category is fetched and summarized inside its own try/except, so one dead
 data source or one failed API call costs that section only — the other three
 still print and still send. See ``PLAN.md`` §6 for the output format and §9 for
 the error-handling strategy.
+
+**stdout is the briefing; stderr is the run log.** The scheduled workflow sends
+stdout to ``/dev/null``, because the briefing includes the owner's portfolio and
+a run log is a durable artefact. That makes stderr the only window onto a
+scheduled run, so every category reports there: which one, how long it took, and
+whether it worked.
 """
 
 from __future__ import annotations
@@ -16,6 +22,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -32,6 +39,11 @@ from app.summarizer import (
 )
 
 logger = logging.getLogger(__name__)
+
+# No timestamp: GitHub Actions stamps every line of a run log already, and a
+# second clock mid-line only makes the log harder to scan. The level is kept
+# because it is what separates "took 2.4s" from "lost its last sentence".
+LOG_FORMAT = "%(levelname)s %(message)s"
 
 
 @dataclass(frozen=True)
@@ -71,14 +83,23 @@ def build_section(heading: str, produce: Callable[[], str]) -> Section:
     """Run one category, converting any failure into an ``[unavailable: ...]`` body.
 
     This is the error-isolation boundary: nothing raised by a fetcher or the
-    summarizer is allowed past it.
+    summarizer is allowed past it. Either way the category leaves exactly one
+    line in the run log saying which it was, how long it took and how it ended.
+
+    The success line carries the summary's length because the scheduled run
+    discards stdout: without it, a summary long enough to be trimmed and one
+    that comfortably fits look identical from the log.
     """
+    started = time.monotonic()
     try:
-        return Section(heading=heading, body=produce())
+        body = produce()
     except Exception as exc:
-        logger.warning("Category %s failed.", heading, exc_info=True)
+        logger.warning("%s failed in %.1fs.", heading, time.monotonic() - started, exc_info=True)
         reason = str(exc) or type(exc).__name__
         return Section(heading=heading, body=f"[unavailable: {reason}]")
+
+    logger.info("%s ok in %.1fs, %d chars.", heading, time.monotonic() - started, len(body))
+    return Section(heading=heading, body=body)
 
 
 def build_report() -> list[Section]:
@@ -104,6 +125,17 @@ def delivery_summary(outcomes: Sequence[SendOutcome]) -> str:
     return f"SMS relay accepted {accepted}/{len(outcomes)}; refused: {', '.join(refused)}."
 
 
+def configure_logging() -> None:
+    """Put this application's run log on stderr at INFO, everything else at WARNING.
+
+    The level is raised on the ``app`` logger rather than on the root, because
+    the root also carries the Anthropic client's HTTP logger: switching that to
+    INFO would bury four category lines under one request line per call.
+    """
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr, format=LOG_FORMAT)
+    logging.getLogger("app").setLevel(logging.INFO)
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse the command line."""
     parser = argparse.ArgumentParser(
@@ -124,8 +156,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     The report is printed before anything is sent, so a failure in delivery
     still leaves the briefing readable.
 
-    Warnings and the delivery summary go to stderr so the report on stdout stays
-    pipeable.
+    The run log goes to stderr so the report on stdout stays pipeable, and all
+    of it goes through ``logging`` so every line has the same shape.
 
     Returns:
         ``0`` if every category reached the relay (or nothing was sent), ``1``
@@ -134,16 +166,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         phone stayed silent.
     """
     args = parse_args(argv)
-    logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+    configure_logging()
 
     sections = build_report()
     print(render(sections))
     if args.dry_run:
+        logger.info("Dry run: %d categories built, nothing sent.", len(sections))
         return 0
 
     outcomes = send_report((section.heading, section.body) for section in sections)
-    print(delivery_summary(outcomes), file=sys.stderr)
-    return 0 if all(outcome.accepted for outcome in outcomes) else 1
+    summary = delivery_summary(outcomes)
+    if all(outcome.accepted for outcome in outcomes):
+        logger.info(summary)
+        return 0
+    # Error rather than warning: this is the run's verdict, and it is the line
+    # to look for when the phone stayed quiet.
+    logger.error(summary)
+    return 1
 
 
 if __name__ == "__main__":

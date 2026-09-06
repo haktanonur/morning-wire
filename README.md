@@ -48,6 +48,19 @@ Both fetch all 4 categories, summarize each, and print the result to the termina
 
 Sending is the default because the scheduled run passes no arguments; `--dry-run` is the developer's flag, and it needs no `MACRODROID_TRIGGER_URL`. A send run exits `1` if any category failed to reach the relay — that exit code is the only failure signal the scheduled job has.
 
+**stdout is the briefing, stderr is the run log.** They are separate because the scheduled workflow keeps only the second:
+
+```
+INFO MARKETS ok in 2.4s, 312 chars.
+WARNING PORTFOLIO summary ran to 704 characters, over the 590 cap; trimming may drop its last sentence.
+INFO PORTFOLIO ok in 3.1s, 590 chars.
+INFO NEWS ok in 2.8s, 401 chars.
+INFO SPORTS ok in 1.9s, 288 chars.
+INFO SMS relay accepted all 4 categories.
+```
+
+One line per category — which one, how long, and how long its summary came out — then one verdict line. A category that fails logs `WARNING <NAME> failed in ...` with a traceback, which is the only place the cause survives; the SMS itself says just `[unavailable: ...]`. The verdict line is logged at `ERROR` when the relay refused anything.
+
 ## The Scheduled Run
 `.github/workflows/daily-brief.yml` runs the brief every day at 03:00 UTC (06:00 Istanbul) and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
 

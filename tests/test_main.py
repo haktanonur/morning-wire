@@ -1,10 +1,18 @@
+import logging
 from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
 
 from app.fetchers.portfolio import PortfolioConfigError
-from app.main import Section, build_report, delivery_summary, main, render
+from app.main import (
+    Section,
+    build_report,
+    configure_logging,
+    delivery_summary,
+    main,
+    render,
+)
 from app.sender import SendOutcome
 from app.summarizer import SummarizationError
 
@@ -133,12 +141,13 @@ def test_main_sends_a_failed_category_as_its_unavailable_body(
     assert ("SPORTS", "[unavailable: source is down]") in list(sections)
 
 
-def test_main_reports_the_delivery_outcome_on_stderr(
-    send: MagicMock, capsys: pytest.CaptureFixture[str]
+def test_main_reports_the_delivery_outcome(
+    send: MagicMock, caplog: pytest.LogCaptureFixture
 ) -> None:
-    main([])
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        main([])
 
-    assert "accepted all 4" in capsys.readouterr().err
+    assert "accepted all 4" in caplog.text
 
 
 def test_main_exits_non_zero_when_a_category_does_not_reach_the_relay(send: MagicMock) -> None:
@@ -175,6 +184,58 @@ def test_dry_run_does_not_need_the_trigger_url(capsys: pytest.CaptureFixture[str
     """No `send` fixture here: a dry run must work with no SMS credentials configured."""
     assert main(["--dry-run"]) == 0
     assert "=== SPORTS ===" in capsys.readouterr().out
+
+
+# --- the run log ------------------------------------------------------------
+#
+# The scheduled workflow discards stdout, so these lines are all anyone can see
+# of a run that has already happened.
+
+
+def test_each_category_logs_its_name_duration_and_length(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        build_report()
+
+    assert [record.getMessage() for record in caplog.records] == [
+        f"{heading} ok in 0.0s, 15 chars." for heading in CATEGORY_PATCHES
+    ]
+
+
+def test_a_failing_category_is_logged_by_name_with_its_traceback(
+    mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The traceback is the only place the cause survives: the SMS says only 'unavailable'."""
+    mocker.patch("app.main.fetch_sports", side_effect=RuntimeError("source is down"))
+
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        build_report()
+
+    (failure,) = [record for record in caplog.records if record.levelno == logging.WARNING]
+    assert failure.getMessage().startswith("SPORTS failed in ")
+    assert failure.exc_info is not None
+
+
+def test_a_refused_delivery_is_logged_as_an_error(
+    send: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A green log with a silent phone is the failure this line exists to prevent."""
+    send.return_value = (SendOutcome(heading="MARKETS", error="ConnectionError"),)
+
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        main([])
+
+    (verdict,) = [record for record in caplog.records if record.levelno == logging.ERROR]
+    assert "refused: MARKETS" in verdict.getMessage()
+
+
+def test_configure_logging_leaves_third_party_loggers_at_warning() -> None:
+    """INFO on the root would bury the four category lines under httpx's request log."""
+    configure_logging()
+
+    assert logging.getLogger("app.summarizer").getEffectiveLevel() == logging.INFO
+    assert logging.getLogger("httpx").getEffectiveLevel() == logging.WARNING
 
 
 def test_delivery_summary_names_only_the_refused_categories() -> None:

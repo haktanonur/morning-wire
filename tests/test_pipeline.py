@@ -19,6 +19,7 @@ entire chain for a category.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -195,7 +196,9 @@ def test_dry_run_builds_the_whole_report_and_still_sends_nothing(
 
 
 def test_a_relay_failure_turns_the_run_red_without_losing_the_report(
-    world: responses.RequestsMock, capsys: pytest.CaptureFixture[str]
+    world: responses.RequestsMock,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The exit code is what makes a silent phone visible to the scheduled job."""
     world.reset()
@@ -203,8 +206,28 @@ def test_a_relay_failure_turns_the_run_red_without_losing_the_report(
     world.add(responses.GET, FOOTBALL_MATCHES_URL, json={"matches": []})
     world.add(responses.GET, TRIGGER_URL, status=502)
 
-    assert main([]) == 1
+    with caplog.at_level(logging.INFO, logger="app"):
+        assert main([]) == 1
 
-    captured = capsys.readouterr()
-    assert "=== PORTFOLIO ===" in captured.out
-    assert "SMS relay accepted 0/4" in captured.err
+    assert "=== PORTFOLIO ===" in capsys.readouterr().out
+    assert "SMS relay accepted 0/4" in caplog.text
+
+
+def test_the_run_log_accounts_for_every_category(
+    world: responses.RequestsMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """All that survives a scheduled run, once stdout has gone to /dev/null.
+
+    Spelled out in full rather than probed line by line, because the value of
+    this log is that nothing is missing from it.
+    """
+    with caplog.at_level(logging.INFO, logger="app"):
+        main([])
+
+    assert [record.getMessage() for record in caplog.records] == [
+        "MARKETS ok in 0.0s, 20 chars.",
+        "PORTFOLIO ok in 0.0s, 21 chars.",
+        "NEWS ok in 0.0s, 23 chars.",
+        "SPORTS ok in 0.0s, 24 chars.",
+        "SMS relay accepted all 4 categories.",
+    ]

@@ -187,13 +187,33 @@ def test_summarize_trims_an_overlong_summary_at_a_sentence_boundary(create: Any)
     assert summary.endswith(".")
 
 
-def test_summarize_warns_when_it_has_to_trim(create: Any, caplog: pytest.LogCaptureFixture) -> None:
-    """Trimming drops the last sentence silently, so it has to be visible in the log."""
+@pytest.mark.parametrize(
+    ("summarize", "argument", "category"),
+    [
+        (summarize_markets, [_headline()], "MARKETS"),
+        (summarize_portfolio, [PortfolioQuote("TSLA", "Tesla", 250.0, 1.5)], "PORTFOLIO"),
+        (summarize_news, [_article()], "NEWS"),
+        (summarize_sports, _matches(), "SPORTS"),
+    ],
+)
+def test_summarize_warns_by_name_when_it_has_to_trim(
+    create: Any,
+    caplog: pytest.LogCaptureFixture,
+    summarize: Any,
+    argument: Any,
+    category: str,
+) -> None:
+    """Trimming drops the last sentence silently, so it has to be visible in the log.
+
+    Named, because the first scheduled run reported a trim at 704 characters
+    without saying which of the four categories had lost a sentence.
+    """
     create.return_value = _reply("Padding for the length cap. " * 40)
 
     with caplog.at_level(logging.WARNING):
-        summarize_markets([_headline()])
+        summarize(argument)
 
+    assert caplog.text.count(f"{category} summary ran to") == 1
     assert "over the" in caplog.text
 
 
