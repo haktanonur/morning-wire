@@ -33,6 +33,7 @@ from pytest_mock import MockerFixture
 
 from app.fetchers.market_news import FINNHUB_NEWS_URL
 from app.fetchers.sports import FOOTBALL_MATCHES_URL
+from app.fetchers.vocabulary import WORDS_PER_DAY, WORDS_PER_MESSAGE
 from app.main import main
 from app.sender import MESSAGE_PARAM
 
@@ -44,6 +45,21 @@ TRIGGER_URL = "https://trigger.macrodroid.com/fake-device-id/daily-sms-bot"
 # came out in this category's SMS. They are kept free of Turkish letters so the
 # expected strings below stay readable after the fold.
 MARKERS = ("Fed", "TSLA", "Meclis", "Arsenal")
+
+
+def _notebook(count: int) -> str:
+    """A vocabulary file in the real format, with numbered entries.
+
+    The first entry's meaning carries Turkish diacritics, so the assertions
+    below cover the fold on the vocabulary path too — it has no summarizer in
+    front of it, and is the one section whose text is never model-generated.
+    """
+    meanings = ["ağır çıkış"] + [f"anlam{n:02d}" for n in range(2, count + 1)]
+    entries = "\n\n".join(
+        f"word{n:02d}\n  Türkçe : {meaning}\n  Not    : not{n:02d}\n  Örnek  : example{n:02d}"
+        for n, meaning in enumerate(meanings, start=1)
+    )
+    return f"DEFTER\n\n{'=' * 70}\nBölüm 1 — Test\n{'=' * 70}\n\n{entries}\n"
 
 
 def _reply(text: str) -> SimpleNamespace:
@@ -84,6 +100,15 @@ def world(mocker: MockerFixture, tmp_path: Path) -> Iterator[responses.RequestsM
     handle = mocker.Mock()
     handle.history.return_value = pd.DataFrame({"Close": [400.0, 412.0]})
     mocker.patch("app.fetchers.portfolio.yf.Ticker", return_value=handle)
+
+    # A real notebook file, parsed for real. Exactly WORDS_PER_DAY entries, so
+    # the date arithmetic lands on offset 0 whatever day the suite runs, and the
+    # expected messages below can be written down. The committed notebook is
+    # deliberately not used: it is appended to, and every append would shift
+    # which words a given date selects.
+    notebook = tmp_path / "vocabulary.txt"
+    notebook.write_text(_notebook(WORDS_PER_DAY), encoding="utf-8")
+    mocker.patch("app.fetchers.vocabulary.DEFAULT_VOCABULARY_PATH", notebook)
 
     mocker.patch(
         "app.fetchers.general_news.feedparser.parse",
@@ -133,7 +158,7 @@ def _sent_messages(http: responses.RequestsMock) -> list[str]:
     return [parse_qs(query)[MESSAGE_PARAM][0] for query in queries]
 
 
-def test_the_whole_pipeline_delivers_four_tagged_folded_messages(
+def test_the_whole_pipeline_delivers_four_tagged_folded_summaries(
     world: responses.RequestsMock,
 ) -> None:
     """Source data in, SMS out, with nothing between the two mocked.
@@ -141,15 +166,53 @@ def test_the_whole_pipeline_delivers_four_tagged_folded_messages(
     The expected strings are spelled out rather than computed: "Bugün ... öne
     çıktı." folded to ASCII is exactly this, and writing it by hand is what
     makes a regression in the fold visible instead of self-consistent.
+
+    Only the four summarized categories are checked here; the vocabulary that
+    follows them has its own test below.
     """
     assert main([]) == 0
 
-    assert _sent_messages(world) == [
+    assert _sent_messages(world)[:4] == [
         "[MARKETS] Bugun Fed one cikti.",
         "[PORTFOLIO] Bugun TSLA one cikti.",
         "[NEWS] Bugun Meclis one cikti.",
         "[SPORTS] Bugun Arsenal one cikti.",
     ]
+
+
+def test_the_vocabulary_arrives_as_three_numbered_messages(
+    world: responses.RequestsMock,
+) -> None:
+    """Fifteen entries, split across messages, numbered continuously through the day.
+
+    The numbering is the assertion that matters: it is what tells the reader on
+    the phone that nothing went missing between message 1 and message 3.
+    """
+    main([])
+
+    vocabulary = _sent_messages(world)[4:]
+
+    assert len(vocabulary) == WORDS_PER_DAY // WORDS_PER_MESSAGE
+    assert vocabulary[0].startswith("[VOCAB 1/3] 1. word01\n= agir cikis\n* not01\n> example01")
+    assert vocabulary[1].startswith("[VOCAB 2/3] 6. word06")
+    assert vocabulary[2].startswith("[VOCAB 3/3] 11. word11")
+    assert [body.count("\n= ") for body in vocabulary] == [WORDS_PER_MESSAGE] * 3
+
+
+def test_the_vocabulary_is_never_shown_to_the_model(
+    world: responses.RequestsMock, mocker: MockerFixture
+) -> None:
+    """The entries are the owner's own notes, and a "helpful" rewrite would be a loss.
+
+    Four API calls, one per summarized category, and none for the vocabulary.
+    """
+    main([])
+
+    from app.summarizer import anthropic
+
+    create = anthropic.Anthropic().messages.create
+    assert create.call_count == 4
+    assert not any("word01" in call.kwargs["messages"][0]["content"] for call in create.mock_calls)
 
 
 def test_the_terminal_report_keeps_the_turkish_the_sms_gives_up(
@@ -179,7 +242,7 @@ def test_a_dead_source_costs_only_its_own_category(
 
     assert main([]) == 0
 
-    markets, portfolio, news, sports = _sent_messages(world)
+    markets, portfolio, news, sports = _sent_messages(world)[:4]
     assert markets == "[MARKETS] Bugun icin veri yok."
     assert sports == "[SPORTS] Bugun kayda deger bir sonuc yok."
     assert portfolio == "[PORTFOLIO] Bugun TSLA one cikti."
@@ -210,7 +273,7 @@ def test_a_relay_failure_turns_the_run_red_without_losing_the_report(
         assert main([]) == 1
 
     assert "=== PORTFOLIO ===" in capsys.readouterr().out
-    assert "SMS relay accepted 0/4" in caplog.text
+    assert "SMS relay accepted 0/7" in caplog.text
 
 
 def test_the_run_log_accounts_for_every_category(
@@ -229,5 +292,6 @@ def test_the_run_log_accounts_for_every_category(
         "PORTFOLIO ok in 0.0s, 21 chars.",
         "NEWS ok in 0.0s, 23 chars.",
         "SPORTS ok in 0.0s, 24 chars.",
-        "SMS relay accepted all 4 categories.",
+        "VOCAB ok in 0.0s, 15 words over 3 messages.",
+        "SMS relay accepted all 7 categories.",
     ]

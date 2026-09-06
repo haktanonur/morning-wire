@@ -7,7 +7,9 @@ Every morning, without manually scanning the news, get a personalized summary ac
 3. Turkey and global current events (politics/news)
 4. Sports: TR Super Lig, La Liga, Premier League, Serie A, NBA, F1 (as implemented: Premier League, La Liga, Serie A only — see §4)
 
-**Current milestone (Phase 3):** scheduling the daily run. Phase 1 (fetch + summarize + terminal output) and Phase 2 (SMS delivery) are done — the brief is sent by running `python -m app.main` by hand, and what remains is doing that every morning without being asked. Building the phases in that order was deliberate: the data and summarization logic was reviewed on its own before delivery or scheduling were in the way.
+A fifth category rides along with them: the day's English vocabulary, taken from the owner's own notebook (`data/vocabulary.txt`). It is deliberately unlike the other four — nothing is fetched and nothing is summarized, because the entries are already written by the person who will read them, so the model has nothing to add and plenty it could paraphrase away. It is here rather than in a separate program because the point is that it arrives with the morning brief, at the same time, without a second thing to schedule.
+
+**Current milestone (Phase 4):** hardening what already runs. Phase 1 (fetch + summarize + terminal output), Phase 2 (SMS delivery) and Phase 3 (the scheduled GitHub Actions run) are done, and the scheduled job has delivered live. Building the phases in that order was deliberate: the data and summarization logic was reviewed on its own before delivery or scheduling were in the way.
 
 ## 2. Out of Scope (Deliberate Decisions)
 - No real-time/instant alerts — once a day
@@ -39,10 +41,10 @@ GitHub Actions schedule (cron: "0 3 * * *" — 06:00 Istanbul, 03:00 UTC)
         |
 python -m app.main   (no wrapper; the CLI is the entry point)
         |
-   [same 4 fetchers + summarizer as Phase 1]
+   [same 4 fetchers + summarizer as Phase 1, then the vocabulary file]
         |
-   MacroDroid webhook -> owner's Android phone -> 4 tagged SMS
-        (markets -> portfolio -> news -> sports)
+   MacroDroid webhook -> owner's Android phone -> 7 tagged SMS
+        (markets -> portfolio -> news -> sports -> vocab 1/3 -> 2/3 -> 3/3)
 ```
 
 Türkiye dropped daylight saving in 2016 and sits on UTC+3 all year, so the cron is a fixed UTC expression with no seasonal correction.
@@ -71,6 +73,16 @@ All three originally planned sources fell through: API-Football's free plan refu
 Results are filtered to a recency window, so a Monday run picks up the weekend fixtures without re-reporting them all week.
 If there's nothing notable (off-season, no matches), returns "nothing notable today" instead of an empty/awkward output.
 
+### Category 5 — English Vocabulary
+Fifteen entries a day out of `data/vocabulary.txt`, the owner's own notebook: the English term, its Turkish meaning, his note on usage, and an example sentence.
+Source: a file committed to this repository. There is no API and no key. The file is data rather than configuration, which is why it is committed instead of held as a repository secret — the runner then gets it from the checkout, and there is no sixth secret to keep in step.
+
+**No summarizer.** This is the only category the model never sees. The entries are already written, in Turkish, by the person about to read them; a "helpful" rewrite would replace study material with the model's guess at it, and there is nothing to condense. The category therefore costs no API call, and its text is the only text in the brief that is not model-generated.
+
+**Selection is a pure function of the date**: `(date.toordinal() * 15) % len(entries)`. Nothing is stored between runs, deliberately — the scheduled job gets a fresh runner every morning, so a cursor would have to be committed back into the repo or cached, and neither is worth it for a notebook meant to be read round and round. 15 and 449 share no common factor, so the offset walks every entry before repeating; a re-run after a failed send repeats the morning's list rather than skipping past it, and the second pass over the notebook is revision rather than a defect.
+
+**Split across three messages of five.** The SMS length itself does not matter here — the messages come off the owner's own SIM (§7) — but the message travels as a *URL query parameter* to a third-party relay with an unpublished request-line limit, and that relay answers `200 ok` whether or not the whole parameter survived. All fifteen at once is ~3,300 encoded characters with no way to notice truncation; five at a time is ~1,100, far inside anything plausible, and reads better on a phone. The entries are numbered continuously (1–15) across the three messages so the reader can see that none went missing.
+
 ## 5. Claude API Usage
 Each category gets its own prompt template in `src/app/summarizer.py`. Raw data (headlines, prices, scores) is passed to the model, which returns a concise summary. Model: Claude Haiku (sufficient for this, and cheap).
 
@@ -96,11 +108,15 @@ Since the switch to MacroDroid (§7) those segments come out of the owner's own 
 
 === SPORTS ===
 <summary>
+
+=== VOCAB 1/3 ===
+<five numbered entries>
+...
 ```
-If a category fails, its section prints `[unavailable: <short reason>]` instead of crashing the run.
+If a category fails, its section prints `[unavailable: <short reason>]` instead of crashing the run. The vocabulary is one failure boundary for all three of its messages, so a missing notebook prints (and sends) a single `[unavailable: ...]` under the heading `VOCAB` rather than three identical ones.
 
 ## 7. Phase 2 — SMS Delivery (MacroDroid)
-4 categories = 4 separate webhook calls, each prefixed with a category tag (e.g. `[MARKETS]`, `[PORTFOLIO]`). `main.py` gains a `--dry-run` flag that reuses the Phase 1 terminal-print path instead of sending. Send order: markets → portfolio → news → sports.
+5 categories = 7 separate webhook calls, each prefixed with a category tag (e.g. `[MARKETS]`, `[PORTFOLIO]`, `[VOCAB 2/3]`). `main.py` gains a `--dry-run` flag that reuses the Phase 1 terminal-print path instead of sending. Send order: markets → portfolio → news → sports → vocabulary. Vocabulary goes last because it is study material rather than news — the part worth re-reading later in the day rather than at 06:00.
 
 **Twilio was the original plan and was dropped**: its Turkey guidelines prohibit person-to-person traffic, which is exactly this use case, and require a registered alphanumeric sender id with corporate documents. NetGSM has the same registration problem. Instead `sender.py` calls a MacroDroid webhook and the owner's own Android phone sends the SMS from its own SIM — no registration, no per-segment bill, and no new Python dependency. See `docs/adr/0006-macrodroid-over-twilio.md` for the phone-side contract, which is not visible from this repo.
 
@@ -130,8 +146,8 @@ Full task breakdown in `TASKS.md`. Summary:
 1. Phase 0 — Skeleton (done: this file set + example `config.py`)
 2. Phase 1 — Fetch + summarize + terminal output (done)
 3. Phase 2 — SMS delivery via the MacroDroid webhook (done)
-4. **Phase 3 — Scheduled deployment: one GitHub Actions workflow (current focus)**
-5. Phase 4 — Hardening (log format, integration test, docs)
+4. Phase 3 — Scheduled deployment: one GitHub Actions workflow (done, and delivering live)
+5. **Phase 4 — Hardening (log format, integration test, docs) — current focus**
 
 ## 11. Accounts / API Keys Needed
 - Anthropic API key (needed starting Phase 1)

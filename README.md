@@ -1,6 +1,6 @@
 # Daily Brief Bot
 
-A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. A GitHub Actions workflow runs the whole thing every morning at 06:00 Istanbul.
+A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. A fifth category, the day's English vocabulary, is read straight off a notebook file in the repo and sent unsummarized. A GitHub Actions workflow runs the whole thing every morning at 06:00 Istanbul.
 
 ## Read First
 - [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md) — rules every coding agent must follow in this repo, plus the Agent Loop
@@ -10,7 +10,7 @@ A personal daily-briefing tool. Fetches data for 4 categories — global markets
 - [`docs/data-sources.md`](./docs/data-sources.md) — APIs used and their limits
 
 ## Status
-Phases 1–3 are done and the scheduled run has delivered live: the brief is fetched, summarized, sent as four SMS and scheduled, with no server and no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)). Phase 4 is hardening what already runs. `TASKS.md` has the exact list and the reasoning behind each item.
+Phases 1–3 are done and the scheduled run has delivered live: the brief is fetched, summarized, sent as SMS and scheduled, with no server and no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)). Phase 4 is hardening what already runs. `TASKS.md` has the exact list and the reasoning behind each item.
 
 ## Local Setup
 ```bash
@@ -44,7 +44,9 @@ mypy src
 python -m app.main --dry-run   # print the briefing, send nothing
 python -m app.main             # print it and send one SMS per category
 ```
-Both fetch all 4 categories, summarize each, and print the result to the terminal. Each category is isolated — if one fails, the others still print, and the failure is sent as `[unavailable: ...]` rather than silently dropped.
+Both build all 5 categories and print the result to the terminal. The first four are fetched and summarized; the fifth is the day's English vocabulary, which is read from [`data/vocabulary.txt`](./data/vocabulary.txt) and never shown to the model — the entries are the owner's own study notes, so a paraphrase would be a loss rather than a summary. Fifteen words a day go out as three numbered messages (`VOCAB 1/3`…), which makes seven SMS in total.
+
+Each category is isolated — if one fails, the others still print, and the failure is sent as `[unavailable: ...]` rather than silently dropped. The vocabulary is one boundary for all three of its messages, so a missing notebook costs one `[unavailable: ...]` SMS rather than three identical ones.
 
 Sending is the default because the scheduled run passes no arguments; `--dry-run` is the developer's flag, and it needs no `MACRODROID_TRIGGER_URL`. A send run exits `1` if any category failed to reach the relay — that exit code is the only failure signal the scheduled job has.
 
@@ -56,7 +58,8 @@ WARNING PORTFOLIO summary ran to 704 characters, over the 590 cap; trimming may 
 INFO PORTFOLIO ok in 3.1s, 590 chars.
 INFO NEWS ok in 2.8s, 401 chars.
 INFO SPORTS ok in 1.9s, 288 chars.
-INFO SMS relay accepted all 4 categories.
+INFO VOCAB ok in 0.0s, 15 words over 3 messages.
+INFO SMS relay accepted all 7 categories.
 ```
 
 One line per category — which one, how long, and how long its summary came out — then one verdict line. A category that fails logs `WARNING <NAME> failed in ...` with a traceback, which is the only place the cause survives; the SMS itself says just `[unavailable: ...]`. The verdict line is logged at `ERROR` when the relay refused anything.
