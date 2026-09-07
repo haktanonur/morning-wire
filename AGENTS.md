@@ -27,7 +27,7 @@ config/portfolio.example.json   # example symbol list (real list is gitignored)
 data/vocabulary.txt        # the owner's English notebook; committed, read at runtime
 docs/                      # architecture, data sources, ADRs
 .github/workflows/ci.yml   # lint + type check + test pipeline
-.github/workflows/daily-brief.yml   # (Phase 3) the scheduled 03:00 UTC run
+.github/workflows/daily-brief.yml   # (Phase 3) the scheduled 02:47 UTC run
 ```
 
 ## Coding Rules

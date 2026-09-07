@@ -95,7 +95,9 @@ curl "https://trigger.macrodroid.com/<device-id>/<trigger-name>?message=test"
 The phone should buzz. Watch the phone, not the response: the endpoint is a cloud relay that answers `ok` as soon as it has queued a push, and it answers exactly the same way when the phone is off, out of credit, or missing the SMS permission. That is why `sender.py` reports `accepted` and never `delivered`, and it is the one hop no log in this project can see.
 
 ## Deploying, Part 2: The Scheduled Run
-`.github/workflows/daily-brief.yml` runs the brief every day at 03:00 UTC (06:00 Istanbul) and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
+`.github/workflows/daily-brief.yml` runs the brief every day at 02:47 UTC (05:47 Istanbul) and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
+
+**The time is a request, not a promise.** GitHub queues scheduled runs and delivers them when it has capacity; the queue is worst at the top of the hour. The cron asks for 05:47 to land near 06:00, which absorbs a delay of a few minutes. It cannot absorb a long one — on 2026-09-08 the run started 4h34m late and the brief arrived at 10:35. If that becomes the norm, the schedule has to move outside GitHub (TASK-022); no setting in this repo can make the queue faster. Two related traps: a scheduled workflow only ever runs on the **default branch**, so a cron change does nothing until it is merged to `main`, and GitHub disables scheduled workflows in a repository that has seen no activity for 60 days.
 
 It needs five repository secrets under **Settings → Secrets and variables → Actions**:
 
