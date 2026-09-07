@@ -37,7 +37,7 @@ Each category runs in its own try/except block — one failing fetcher does not 
 
 ### Phase 2+ (later)
 ```
-GitHub Actions schedule (cron: "0 3 * * *" — 06:00 Istanbul, 03:00 UTC)
+GitHub Actions schedule (cron: "47 2 * * *" — asks 05:47 Istanbul, to land near 06:00)
         |
 python -m app.main   (no wrapper; the CLI is the entry point)
         |

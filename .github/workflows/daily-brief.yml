@@ -4,16 +4,23 @@ name: Daily Brief
 # behind this: docs/adr/0007-github-actions-over-aws-lambda.md explains why the
 # scheduler the repo already had won over the one that needed four more tasks.
 on:
-  # 03:00 UTC = 06:00 Istanbul. Türkiye has been on a fixed UTC+3 since 2016, so
+  # 02:47 UTC = 05:47 Istanbul. Türkiye has been on a fixed UTC+3 since 2016, so
   # a plain UTC cron holds all year with no seasonal correction.
   #
-  # GitHub documents this trigger as best-effort: it can be delayed under load,
-  # and heavily queued jobs can be dropped outright. The top of the hour is the
-  # worst case, which is exactly where this sits — an accepted trade for a
-  # personal brief. If mornings start going missing, shifting to "7 3 * * *" is
-  # the cheap first thing to try.
+  # This asks for 05:47 to deliver at 06:00, which is deliberate. GitHub
+  # documents `schedule` as best-effort: the run is queued, not guaranteed, and
+  # it can be delayed or dropped under load. The queue is worst at the top of
+  # the hour, where every cron in the world is pointed — and on 2026-09-08 this
+  # workflow, then set to "0 3 * * *", started 4h34m late and the brief landed
+  # at 10:35 Istanbul. Moving off :00 and asking 13 minutes early is the cheap
+  # half of the fix: it costs nothing and absorbs a small delay, arriving a few
+  # minutes early rather than a few minutes late.
+  #
+  # It does not fix a multi-hour queue, and nothing inside this file can. If
+  # that recurs, the workflow has to be started from outside — an always-on
+  # caller hitting the workflow_dispatch API at a fixed time. See TASK-022.
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "47 2 * * *"
 
   # A scheduled workflow only ever runs on the default branch, so this file
   # cannot be tested by pushing a task branch. Manual dispatch is the only way
