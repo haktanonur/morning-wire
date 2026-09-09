@@ -10,7 +10,7 @@ A personal daily-briefing tool. Fetches data for 4 categories — global markets
 - [`docs/data-sources.md`](./docs/data-sources.md) — APIs used and their limits
 
 ## Status
-Phases 1–3 are done and the scheduled run has delivered live: the brief is fetched, summarized, sent as SMS and scheduled, with no server and no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)). Phase 4 is hardening what already runs. `TASKS.md` has the exact list and the reasoning behind each item.
+Phases 1–3 are done and delivering live: the brief is fetched, summarized, sent as SMS and scheduled, with no server and no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)). Scheduling is the part that did not go to plan — GitHub's cron ran hours late, so the workflow now has no schedule and the phone triggers it instead ([Part 3](#deploying-part-3-the-clock)). Phase 4 is hardening what already runs. `TASKS.md` has the exact list and the reasoning behind each item.
 
 ## Local Setup
 ```bash
@@ -94,12 +94,12 @@ curl "https://trigger.macrodroid.com/<device-id>/<trigger-name>?message=test"
 
 The phone should buzz. Watch the phone, not the response: the endpoint is a cloud relay that answers `ok` as soon as it has queued a push, and it answers exactly the same way when the phone is off, out of credit, or missing the SMS permission. That is why `sender.py` reports `accepted` and never `delivered`, and it is the one hop no log in this project can see.
 
-## Deploying, Part 2: The Scheduled Run
-`.github/workflows/daily-brief.yml` runs the brief every day at 02:47 UTC (05:47 Istanbul) and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
+## Deploying, Part 2: The Workflow
+`.github/workflows/daily-brief.yml` runs the brief and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
 
-**The time is a request, and on this repository it is not granted.** GitHub queues scheduled runs and delivers them when it has capacity. Both 2026-09-08 and 2026-09-09 started at **10:34 Istanbul** — the second time from a cron moved 13 minutes earlier, which is how we know the cron is not what decides. If you want the brief at a particular hour, do [Part 3](#deploying-part-3-making-it-arrive-on-time); nothing in this file can make the queue faster.
+**It has no cron.** `workflow_dispatch` is its only trigger, and the phone decides when it runs — [Part 3](#deploying-part-3-the-clock) is therefore not optional if you want a brief at all. A `schedule:` block was tried first and removed: GitHub queues scheduled runs and drains the queue when it suits, which put the brief at 10:34 Istanbul on two consecutive mornings, the second from a cron deliberately moved 13 minutes earlier. That the start time did not shift by even a minute is what settled it.
 
-Two related traps: a scheduled workflow only ever runs on the **default branch**, so a cron change does nothing until it is merged to `main`, and GitHub disables scheduled workflows in a repository that has seen no activity for 60 days.
+One trap survives from that period, because it applies to the workflow file itself: the dispatch always runs the copy of it on **`main`**, so a change proves nothing until it is merged.
 
 It needs five repository secrets under **Settings → Secrets and variables → Actions**:
 
@@ -113,14 +113,16 @@ It needs five repository secrets under **Settings → Secrets and variables → 
 
 `PORTFOLIO_JSON` is the one that is easy to miss: the real portfolio file is gitignored, so it is not in the runner's checkout and the workflow writes it back from this secret. Without it the portfolio section reads `[unavailable: ...]` every morning while everything else looks fine.
 
-Run it by hand from the Actions tab — "Run workflow", with **Run the pipeline but send no SMS** ticked for a dry run. That is the only way to test it: scheduled workflows only ever run on the default branch, so a change to this file proves nothing until it is on `main`.
+Run it by hand from the Actions tab — "Run workflow", with **Run the pipeline but send no SMS** ticked for a dry run. Do that after merging any change to it, since the dispatch runs the copy on `main`.
 
-Two things to know when it misbehaves. GitHub's schedule is best-effort and can be delayed or, under load, skipped — a brief that arrives late is normal, one that never arrives is worth checking. And GitHub disables scheduled workflows in a repository with no activity for 60 days, so if the runs stop entirely, look at the Actions tab before the code.
+When a morning goes missing, the Actions tab answers the first question by itself: **is there a run at all?** No run means the phone never asked — a dead token, no connectivity, or the macro disabled — and note that GitHub sends no failure email in this case, because it only mails about runs that exist. A run that exists tells you the rest from its own log.
 
-## Deploying, Part 3: Making It Arrive On Time
-Skip this if the scheduled run already lands when you want it. It exists because on this repository it does not: on both 2026-09-08 and 2026-09-09 the run started at **10:34 Istanbul**, the second time from a cron that had been moved 13 minutes earlier. Moving the cron changed nothing, which is the useful measurement — GitHub's queue was draining at its own convenience, not ours, so no value in `daily-brief.yml` was ever going to fix it.
+## Deploying, Part 3: The Clock
+**This is required, not optional** — the workflow has no cron, so without this nothing ever runs.
 
-**The fix is to stop asking GitHub for a time.** A `workflow_dispatch` call runs immediately, because it is a request rather than a queued job. So the schedule moves out of GitHub and onto something that is awake at 06:00 and already part of this system: the same phone that sends the SMS. It calls the GitHub API, the run starts at once, and about a minute later the phone receives the brief it just asked for.
+It is set up this way because GitHub's own scheduler would not keep time here: on both 2026-09-08 and 2026-09-09 the run started at **10:34 Istanbul**, the second time from a cron that had been moved 13 minutes earlier. Moving it changed nothing, which is the useful measurement — the queue was draining at GitHub's convenience, not ours, so no value in `daily-brief.yml` was ever going to fix it.
+
+**So the clock moved out of GitHub.** A `workflow_dispatch` call runs immediately, because it is a request rather than a queued job. What issues that call is something already awake at 06:00 and already part of this system: the same phone that sends the SMS. It calls the GitHub API, the run starts at once, and about a minute later the phone receives the brief it just asked for.
 
 The phone is a strange-looking scheduler but the right one here. The work itself cannot move to it — the fetching, the Claude calls and the API keys all belong on the runner — so the phone's only job is to say *now*.
 
@@ -157,31 +159,33 @@ Note `"dry_run":"true"` is the **string** `"true"`, not a bare `true`. The workf
 
 Then open the Actions tab. A run should be there already, and it should say **Manually run** rather than **Scheduled**. That word is the proof: it is the difference between the fast path and the queue.
 
-**3. Add the macro** in MacroDroid. This is a second macro — leave the SMS one from Part 1 alone.
+**3. Add the macro** in MacroDroid. This is a second macro — leave the SMS one from Part 1 alone. The settings are spread across the HTTP Request action's own tabs:
 
-| Part | Setting |
-|---|---|
-| Trigger | **Date/Time → Time of Day**, 06:00, repeating daily |
-| Action | **Connectivity → HTTP Request** |
-| Method | `POST` |
-| URL | `https://api.github.com/repos/<owner>/<repo>/actions/workflows/daily-brief.yml/dispatches` |
-| Content type | `application/json` |
-| Body | `{"ref":"main","inputs":{"dry_run":"false"}}` |
-| Headers | `Authorization: Bearer <token>` and `Accept: application/vnd.github+json` |
+| Tab | Field | Value |
+|---|---|---|
+| Settings | Request method | `POST` |
+| Settings | URL | `https://api.github.com/repos/<owner>/<repo>/actions/workflows/daily-brief.yml/dispatches` |
+| Settings | Block next actions until complete | **ticked**, if you want to read the status code |
+| Content Body | Content type | `application/json` |
+| Content Body | Body | `{"ref":"main"}` |
+| Header Params | `Authorization` | `Bearer <token>` |
+| Header Params | `Accept` | `application/vnd.github+json` |
 
-Exact menu wording moves between MacroDroid versions; what matters is a POST with those two headers and that body.
+The trigger is **Date/Time → Time of Day**, 06:00, repeating daily. Query Params stays empty.
+
+Two fields that look relevant and are not. **"Use authorization" under Basic Authorization is the wrong one** — that is HTTP Basic auth, while GitHub wants the token in an `Authorization` *header*, which is the Header Params tab. And the body is `{"ref":"main"}` with **no `inputs`**: `dry_run` defaults to false in the workflow, so omitting it sends the SMS. Passing it is legal but it is a JSON object inside a JSON object typed on a phone keyboard, which is exactly where a stray quote produces a `400` — and MacroDroid's editor can substitute smart quotes. If you get a `400`, retype the body by hand rather than pasting it.
 
 **4. Test it in three steps, not one.** Each step rules out a different thing, and doing them together tells you only that something is wrong:
 
-1. Run the macro with MacroDroid's own play/test button. Watch the **Actions tab**, not the phone — a new run appearing within seconds means the token, URL and headers are right.
-2. Set the trigger a couple of minutes ahead and put the phone down. If the run appears unattended, the time trigger fires while the phone is idle, which is the part battery optimisation breaks.
-3. Only then set it to 06:00 and wait a morning.
+1. Run the macro with MacroDroid's play/test button. Watch the **Actions tab**, not the phone — a new run within seconds means the token, URL and headers are right. It should say **Manually run**, not Scheduled.
+2. Set the trigger a couple of minutes ahead and put the phone down. If the run appears unattended, the time trigger survives an idle screen, which is the part battery optimisation breaks.
+3. Only then set it to 06:00.
 
-As in Part 1, **the response does not prove delivery** — a `204` says GitHub accepted the request, and the brief arriving is what says the rest of the chain worked.
+To see the status code during testing, use **Settings → Save HTTP return code in integer variable**, make it a **local** variable, and add a Display Toast action showing it. Local variables are referenced as `{lv=name}` — `{v=name}` is the global syntax and will appear on screen literally. Both the variable and the toast can be deleted once it works.
 
-**5. Remove the cron once this works**, otherwise you get the brief twice: once when the phone asks for it, and again whenever GitHub's queue gets around to the scheduled run. Deleting the `schedule:` block from `daily-brief.yml` leaves `workflow_dispatch:` as the only trigger, which is all the phone needs.
+As in Part 1, **the response does not prove delivery**: `204` says GitHub accepted the request, and the brief arriving is what says the rest of the chain worked.
 
-Keeping the cron as a fallback sounds prudent and is not: it cannot tell whether the phone already triggered a run, so its only effect is a duplicate brief every morning. If the phone is off, that morning has no brief — which is the same morning the SMS could not have arrived anyway.
+**Do not add a cron back as a safety net.** It cannot tell that the phone already triggered a run, so its only effect is a second brief every morning. A morning when the phone is off is a morning it could not have received the SMS anyway.
 
 ## Getting Started With Claude Code
 Open this repo in Claude Code and start with:

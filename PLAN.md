@@ -37,7 +37,9 @@ Each category runs in its own try/except block — one failing fetcher does not 
 
 ### Phase 2+ (later)
 ```
-GitHub Actions schedule (cron: "47 2 * * *" — asks 05:47 Istanbul, to land near 06:00)
+MacroDroid time trigger on the owner's phone, 06:00 Istanbul
+        |
+POST .../workflows/daily-brief.yml/dispatches   (runs at once; not queued)
         |
 python -m app.main   (no wrapper; the CLI is the entry point)
         |
@@ -47,9 +49,11 @@ python -m app.main   (no wrapper; the CLI is the entry point)
         (markets -> portfolio -> news -> sports -> vocab 1/3 -> 2/3 -> 3/3)
 ```
 
-Türkiye dropped daylight saving in 2016 and sits on UTC+3 all year, so the cron is a fixed UTC expression with no seasonal correction.
+The loop is deliberate: the phone asks for the brief and then receives it. Only the *timing* lives on the phone — the fetching, the Claude calls and the API keys all stay on the runner, so the phone holds one narrow token and nothing else.
 
-The scheduler was **EventBridge + Lambda** until `docs/adr/0007`: the repo already ran GitHub Actions on every push, so scheduling there costs a `on: schedule` block instead of a handler, a dependency bundle, an IAM role and an AWS account. The trade is that GitHub's schedule is best-effort — it can be delayed at the top of the hour and, under enough load, dropped — where EventBridge's was not.
+The scheduler was **EventBridge + Lambda** until `docs/adr/0007`, then GitHub's own `on: schedule` until it turned out not to keep time: two consecutive mornings started at 10:34 Istanbul, the second from a cron moved 13 minutes earlier, because scheduled runs are queued and drained at GitHub's convenience. A `workflow_dispatch` call is not queued, so the clock moved to the phone (TASK-022) and the cron was deleted rather than kept — a cron cannot tell that the phone already triggered a run, so it would only ever add a duplicate brief. Since the phone sets the time, no timezone conversion is left to get wrong; Türkiye's fixed UTC+3 no longer matters here.
+
+The cost is that scheduling now has a single point of failure that GitHub cannot report on: if the phone never calls, there is no run, and GitHub only emails about runs that exist. A silent morning is the only signal.
 
 ## 4. Category Design
 
@@ -125,15 +129,15 @@ The trade is that **delivery is no longer observable**. The webhook is a cloud r
 ## 8. Phase 3 — Scheduled Deployment (GitHub Actions)
 | Component | Mechanism | Why |
 |---|---|---|
-| Scheduling | `on: schedule` in `.github/workflows/daily-brief.yml` | Already in the repo; no second platform |
+| Scheduling | A MacroDroid time trigger POSTing to the `workflow_dispatch` API | GitHub's own `schedule` is queued and would not keep time (TASK-022); a dispatch runs at once |
 | Execution | `python -m app.main` on an `ubuntu-latest` runner | Same install line CI already runs |
 | Secrets | GitHub Actions secrets → environment variables | Keys never live in code |
 | Logging | The workflow run log | Only stderr; stdout is discarded so the briefing is not written into it |
-| Failure alert | GitHub's email on a failed scheduled run | The job fails silently otherwise; this is why the run exits non-zero |
+| Failure alert | GitHub's email on a failed run | The job fails silently otherwise; this is why the run exits non-zero |
 
 **AWS was the plan until `docs/adr/0007-github-actions-over-aws-lambda.md` replaced it**, which supersedes `docs/adr/0003-aws-lambda-serverless.md` and deleted four backlog tasks (Lambda handler, packaging, EventBridge, Secrets Manager). No `lambda_handler.py` is needed: `main.py` is already the entry point.
 
-Two caveats worth remembering: a scheduled workflow only ever runs on the **default branch**, so it cannot be tested from a task branch — hence the `workflow_dispatch` trigger — and GitHub disables scheduled workflows in a repository that has seen no activity for 60 days.
+`workflow_dispatch` is now the workflow's only trigger, so two former caveats are gone with the cron — GitHub cannot disable a schedule that no longer exists, and there is no queue to wait in. The one that survives is that a dispatch always runs the copy of the workflow on the **default branch**, so a change to it proves nothing until merged. The new caveat replacing them: **the failure alert only covers runs that started.** If the phone never calls, no run exists and no mail is sent.
 
 ## 9. Error Handling Strategy
 - Each category runs in its own try/except block

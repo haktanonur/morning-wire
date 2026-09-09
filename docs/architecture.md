@@ -20,7 +20,7 @@ notebook costs one `[unavailable: ...]` rather than three.
 
 ## Phase 2+ Component Diagram
 ```
-GitHub Actions schedule (cron: "47 2 * * *" — asks 05:47 Istanbul, to land near 06:00)
+MacroDroid time trigger, 06:00 Istanbul -> POST .../dispatches (not queued)
         |
 python -m app.main   (no wrapper; the CLI is the entry point)
         |
