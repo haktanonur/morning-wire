@@ -4,28 +4,27 @@ name: Daily Brief
 # behind this: docs/adr/0007-github-actions-over-aws-lambda.md explains why the
 # scheduler the repo already had won over the one that needed four more tasks.
 on:
-  # 02:47 UTC = 05:47 Istanbul. Türkiye has been on a fixed UTC+3 since 2016, so
-  # a plain UTC cron holds all year with no seasonal correction.
+  # There is deliberately no `schedule:` here any more, and it should not be
+  # added back. The clock now lives on the owner's phone: a MacroDroid time
+  # trigger POSTs to this workflow's dispatch endpoint at 06:00 Istanbul, and
+  # the run starts immediately because a dispatch is a request rather than a
+  # queued job. README "Deploying, Part 3" has the setup.
   #
-  # This asks for 05:47 to deliver at 06:00, which is deliberate. GitHub
-  # documents `schedule` as best-effort: the run is queued, not guaranteed, and
-  # it can be delayed or dropped under load. The queue is worst at the top of
-  # the hour, where every cron in the world is pointed — and on 2026-09-08 this
-  # workflow, then set to "0 3 * * *", started 4h34m late and the brief landed
-  # at 10:35 Istanbul. Moving off :00 and asking 13 minutes early is the cheap
-  # half of the fix: it costs nothing and absorbs a small delay, arriving a few
-  # minutes early rather than a few minutes late.
+  # The cron was removed on evidence, not preference. It ran at "0 3 * * *" and
+  # started 4h34m late; moved to "47 2 * * *" it started at the *same* minute
+  # the following day. Both mornings the brief landed at 10:34-10:35 Istanbul,
+  # which is what says GitHub's queue, not the cron expression, was choosing
+  # the time. No value in this file could have fixed that.
   #
-  # It does not fix a multi-hour queue, and nothing inside this file can. If
-  # that recurs, the workflow has to be started from outside — an always-on
-  # caller hitting the workflow_dispatch API at a fixed time. See TASK-022.
-  schedule:
-    - cron: "47 2 * * *"
-
-  # A scheduled workflow only ever runs on the default branch, so this file
-  # cannot be tested by pushing a task branch. Manual dispatch is the only way
-  # to exercise it, and the dry_run input makes that possible without spending
-  # four real SMS.
+  # Restoring the cron as a fallback would not help either: it cannot tell that
+  # the phone already triggered a run, so its only effect is a second brief
+  # every morning. A morning when the phone is off is a morning it could not
+  # have received the SMS anyway.
+  #
+  # The trade accepted here: the phone is now a single point of failure for
+  # scheduling, and a run that never starts produces no failed-run email,
+  # because GitHub only mails about runs that exist. A silent morning is the
+  # signal.
   workflow_dispatch:
     inputs:
       dry_run:
