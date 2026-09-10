@@ -38,8 +38,8 @@ The cron was removed rather than kept as a fallback: it cannot tell that the pho
 
 **GitHub disables scheduled workflows in an inactive repository** — "in a public repository, scheduled workflows are automatically disabled when no repository activity has occurred in 60 days." This no longer applies, since there is no schedule left to disable; it is recorded here because it was one of the arguments weighed above, and because restoring a cron would restore the hazard.
 
-**Making this repository public would leak the briefing.** Workflow run logs are visible to anyone on a public repo, and `main.py` prints the whole report — including the portfolio section — to stdout. TASK-019 discards stdout in the workflow and keeps only stderr (warnings and the delivery summary) for that reason, which also keeps the run log to the few lines worth reading.
+**Run logs are the reason the briefing is not printed where it could be read.** Workflow run logs are visible to anyone on a public repository, and `main.py` prints the whole report — including the portfolio section — to stdout. TASK-019 discards stdout in the workflow and keeps only stderr (warnings and the delivery summary) for that reason, which also keeps the run log to the few lines worth reading. That step is what makes publishing this repository a choice rather than a leak; what remains visible in a public log is listed in README "Making This Repository Public", and the sharpest item is that a failed price lookup logs the ticker it failed on.
 
-Minutes are billable on a private repository against the account's monthly free allowance. One daily run of a minute or two is negligible beside the per-push CI runs, which are the real consumer.
+Minutes are billable on a private repository against the account's monthly free allowance. One daily run of a minute or two is negligible beside the per-push CI runs, which are the real consumer — and going public removes the charge entirely.
 
 ADR 0003's own trade-off — "Lambda-specific packaging needs to be learned" — is now resolved by not learning it.
