@@ -15,7 +15,7 @@ Failure notification decides it. This is an unattended job whose only observable
 ## Decision
 The daily run is a GitHub Actions workflow (`.github/workflows/daily-brief.yml`, TASK-019) running `python -m app.main`, targeting 06:00 Istanbul as the EventBridge expression ADR 0003 implied. Credentials come from GitHub Actions secrets; the run log replaces CloudWatch.
 
-**GitHub runs the job; it no longer decides when.** The workflow was scheduled with `cron` until TASK-022 removed it — the consequence below stopped being hypothetical — and its only trigger is now `workflow_dispatch`, called each morning from the owner's phone. The half of this decision about *where the code runs* is unchanged and is what the arguments above are actually about; the half about *what keeps time* did not survive contact with the queue.
+**GitHub runs the job; it no longer decides when.** The workflow was scheduled with `cron` until TASK-022 removed it — the consequence below stopped being hypothetical — and its only trigger is now `workflow_dispatch`, called each morning from the relay phone — which, once the reader is offline, is a friend's device rather than the owner's. The half of this decision about *where the code runs* is unchanged and is what the arguments above are actually about; the half about *what keeps time* did not survive contact with the queue.
 
 AWS is dropped from the project entirely. TASK-009 (`lambda_handler.py`), TASK-010 (packaging), TASK-011 (EventBridge) and TASK-012 (Secrets Manager) are removed from `TASKS.md` rather than deferred, and `src/app/lambda_handler.py` will not be written — `main.py` is already the entry point, so the wrapper existed only to satisfy Lambda's calling convention.
 
