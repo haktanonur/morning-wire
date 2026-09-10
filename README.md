@@ -1,6 +1,31 @@
 # Daily Brief Bot
 
-A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. A fifth category, the day's English vocabulary, is read straight off a notebook file in the repo and sent unsummarized. A GitHub Actions workflow runs the whole thing every morning at 06:00 Istanbul.
+A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. A fifth category, the day's English vocabulary, is read straight off a notebook file in the repo and sent unsummarized. A GitHub Actions workflow runs the whole thing; the phone tells it when, at 06:00 Istanbul.
+
+## Why This Exists
+This was built for a year of Turkish military service, where there is no
+internet, no browser and no phone for most of the day — but there is, reliably,
+an SMS inbox.
+
+That single constraint is the whole design. Every choice in this repo follows
+from it: SMS rather than an app or an email, because SMS is the only channel
+that survives; one message per category ([`docs/adr/0004`](./docs/adr/0004-per-category-sms.md)),
+because a message that arrives half-read is worse than four that each stand
+alone; Turkish folded into GSM-7 ([`docs/adr/0005`](./docs/adr/0005-fold-turkish-to-gsm7.md)),
+because Turkish characters otherwise cut a segment from 153 characters to 67 and
+the brief stops fitting; and a summarizer at all, because 160 characters of
+signal beats a link to an article that cannot be opened.
+
+It is a deliberately small window on the world, sized to what fits on a lock
+screen: what the markets did, what the portfolio did, what happened in Turkey and
+outside it, how the football went — and fifteen English words a day from a
+notebook, so that a year is not a year of forgetting.
+
+The unattended parts are unattended for the same reason. Nobody will be there to
+restart a failed run, re-enter an expired key or notice a silent morning, so the
+things that can quietly stop — the phone's token, the API credit — are worth
+setting to outlive the deployment rather than the month. What a missing brief
+means, and where to look first, is in [Part 2](#deploying-part-2-the-workflow).
 
 ## Read First
 - [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md) — rules every coding agent must follow in this repo, plus the Agent Loop
@@ -186,6 +211,29 @@ To see the status code during testing, use **Settings → Save HTTP return code 
 As in Part 1, **the response does not prove delivery**: `204` says GitHub accepted the request, and the brief arriving is what says the rest of the chain worked.
 
 **Do not add a cron back as a safety net.** It cannot tell that the phone already triggered a run, so its only effect is a second brief every morning. A morning when the phone is off is a morning it could not have received the SMS anyway.
+
+## Making This Repository Public
+Nothing here has to stay private. The four API keys and the webhook URL live in
+Actions secrets, which are masked in logs and are never handed to a fork; the
+real `config/portfolio.json` and `.env` are gitignored and have never been
+committed; and `workflow_dispatch` requires write access, so a stranger cannot
+trigger the brief. The recipient's phone number is in the MacroDroid macro, not
+in this repo. Publishing also makes Actions minutes free, which a private repo
+bills against the monthly allowance.
+
+Three things do become visible, and they are personal rather than secret:
+
+- **`data/vocabulary.txt`** — the owner's own study notes, published as-is.
+- **`config/portfolio.example.json`** — example symbols only, never the real
+  holdings, which come from the `PORTFOLIO_JSON` secret at run time.
+- **Run logs.** The workflow sends stdout to `/dev/null`, so the briefing itself
+  is never written down; stderr keeps only category names, timings, character
+  counts and the delivery verdict. The one exception worth knowing: a failed
+  price lookup logs the *ticker* it failed on, so a bad morning can reveal which
+  symbols are held — never how many, and never their value.
+
+If any of that is unwelcome, the fix is per item — drop the notebook from the
+repo, or accept the tickers — not a private repository.
 
 ## Getting Started With Claude Code
 Open this repo in Claude Code and start with:
