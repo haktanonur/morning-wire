@@ -3,23 +3,27 @@
 A personal daily-briefing tool. Fetches data for 4 categories — global markets, personal portfolio, TR + global news, and sports — summarizes each with the Claude API in Turkish, and sends one SMS per category through a MacroDroid webhook on the owner's own phone. A fifth category, the day's English vocabulary, is read straight off a notebook file in the repo and sent unsummarized. A GitHub Actions workflow runs the whole thing; the phone tells it when, at 06:00 Istanbul.
 
 ## Why This Exists
-This was built for a year of Turkish military service, where there is no
-internet, no browser and no phone for most of the day — but there is, reliably,
+Some situations cut you off from the internet for a stretch of time — military
+service, a hospital stay, fieldwork, a place with no coverage. The connection
+goes, the browser goes, often the phone goes with them. What usually survives is
 an SMS inbox.
 
-That single constraint is the whole design. Every choice in this repo follows
-from it: SMS rather than an app or an email, because SMS is the only channel
-that survives; one message per category ([`docs/adr/0004`](./docs/adr/0004-per-category-sms.md)),
+This was built for exactly that: to keep following the handful of things you
+follow every day, when the way you normally follow them is gone.
+
+That constraint is the whole design. Every choice in this repo comes out of it:
+SMS rather than an app or an email, because SMS is the channel that still
+arrives; one message per category ([`docs/adr/0004`](./docs/adr/0004-per-category-sms.md)),
 because a message that arrives half-read is worse than four that each stand
 alone; Turkish folded into GSM-7 ([`docs/adr/0005`](./docs/adr/0005-fold-turkish-to-gsm7.md)),
 because Turkish characters otherwise cut a segment from 153 characters to 67 and
 the brief stops fitting; and a summarizer at all, because 160 characters of
 signal beats a link to an article that cannot be opened.
 
-It is a deliberately small window on the world, sized to what fits on a lock
-screen: what the markets did, what the portfolio did, what happened in Turkey and
-outside it, how the football went — and fifteen English words a day from a
-notebook, so that a year is not a year of forgetting.
+It is a deliberately small window, sized to what fits on a lock screen: what the
+markets did, what the portfolio did, what happened at home and outside it, how
+the football went — and fifteen English words a day from a notebook, so that
+time away is not time spent losing ground.
 
 The unattended parts are unattended for the same reason. Nobody will be there to
 restart a failed run, re-enter an expired key or notice a silent morning, so the
