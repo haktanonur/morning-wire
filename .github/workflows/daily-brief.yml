@@ -68,6 +68,22 @@ jobs:
           PORTFOLIO_JSON: ${{ secrets.PORTFOLIO_JSON }}
         run: printf '%s' "$PORTFOLIO_JSON" > config/portfolio.json
 
+      # Same reasoning as the portfolio, with one wrinkle: the word list is
+      # personal, gitignored, and far too big to hold as plain text — Actions
+      # caps a secret at 48 KB. It is stored gzipped and base64-encoded, which
+      # fits, and is expanded back here.
+      #
+      # `set -o pipefail` matters: without it the exit status comes from gzip
+      # alone, so a corrupt or truncated secret would fail base64, leave an
+      # empty file, and let the run continue to a "[unavailable: ...]" vocab
+      # section instead of failing where the cause is visible.
+      - name: Restore the vocabulary list
+        env:
+          VOCABULARY_TXT_GZ: ${{ secrets.VOCABULARY_TXT_GZ }}
+        run: |
+          set -o pipefail
+          printf '%s' "$VOCABULARY_TXT_GZ" | base64 --decode | gunzip > data/vocabulary.txt
+
       # stdout carries the whole briefing, portfolio included, and workflow logs
       # are visible to anyone if a repository is ever made public. The SMS is
       # the output; the log only needs stderr, which is the warnings and the

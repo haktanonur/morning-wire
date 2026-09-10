@@ -16,6 +16,7 @@ from urllib.parse import quote
 import pytest
 
 from app.fetchers.vocabulary import (
+    EXAMPLE_VOCABULARY_PATH,
     WORDS_PER_DAY,
     WORDS_PER_MESSAGE,
     VocabularyEntry,
@@ -115,19 +116,21 @@ def test_load_raises_when_nothing_parses(tmp_path: Path) -> None:
         load_vocabulary(path)
 
 
-# --- the committed notebook -------------------------------------------------
+# --- the committed example --------------------------------------------------
 
 
-def test_the_real_notebook_parses_completely() -> None:
-    """Guards the data file itself, which is edited by hand and keeps growing.
+def test_the_example_notebook_parses_completely() -> None:
+    """Guards `data/vocabulary.example.txt`, the only in-repo record of the format.
 
-    The count is not asserted, because appending to the notebook is the normal
-    way to use it; what is asserted is that nothing parses to a blank field,
-    which is what a broken edit would look like.
+    The real list is personal, gitignored and restored from a secret on the
+    runner, so it cannot be asserted against here — which leaves the example
+    file carrying the format on its own. If the parser changes and the example
+    is not updated with it, every new deployment starts from a file that no
+    longer works, and nothing else would catch that.
     """
-    entries = load_vocabulary()
+    entries = load_vocabulary(EXAMPLE_VOCABULARY_PATH)
 
-    assert len(entries) >= WORDS_PER_DAY
+    assert entries
     assert all(entry.term and entry.turkish and entry.note and entry.example for entry in entries)
 
 
@@ -196,8 +199,8 @@ def test_the_markers_survive_the_gsm7_fold() -> None:
     assert to_gsm7(rendered) == rendered
 
 
-def test_a_day_splits_into_whole_messages_numbered_continuously(tmp_path: Path) -> None:
-    messages = daily_messages(date(2026, 9, 7))
+def test_a_day_splits_into_whole_messages_numbered_continuously() -> None:
+    messages = daily_messages(date(2026, 9, 7), path=EXAMPLE_VOCABULARY_PATH)
 
     assert len(messages) == WORDS_PER_DAY // WORDS_PER_MESSAGE
     assert messages[0].startswith("1. ")
@@ -205,13 +208,17 @@ def test_a_day_splits_into_whole_messages_numbered_continuously(tmp_path: Path) 
     assert all(body.count("\n= ") == WORDS_PER_MESSAGE for body in messages)
 
 
-def test_every_message_stays_well_inside_a_url(tmp_path: Path) -> None:
+def test_every_message_stays_well_inside_a_url() -> None:
     """The reason the day is split at all: the body travels as a query parameter.
 
     The relay answers ``200 ok`` whether or not an overlong parameter survived,
     so there is no way to notice this going wrong from the outside.
+
+    Measured against the example notebook, whose entries are written at the same
+    length as the real one — the real list is gitignored and not on a runner
+    until the secret is expanded, so it cannot be the thing under test.
     """
-    for body in daily_messages(date(2026, 9, 7)):
+    for body in daily_messages(date(2026, 9, 7), path=EXAMPLE_VOCABULARY_PATH):
         encoded = quote(to_gsm7(f"[VOCAB 1/3] {body}"), safe="")
 
         assert len(encoded) < 2000

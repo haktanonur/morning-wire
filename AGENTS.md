@@ -24,7 +24,7 @@ src/app/
   sender.py               # SMS delivery via a MacroDroid webhook
 tests/                    # mirrors src/app structure 1:1, plus conftest.py guards
 config/portfolio.example.json   # example symbol list (real list is gitignored)
-data/vocabulary.txt        # the owner's English notebook; committed, read at runtime
+data/vocabulary.example.txt     # format sample (the real list is gitignored)
 docs/                      # architecture, data sources, ADRs
 .github/workflows/ci.yml   # lint + type check + test pipeline
 .github/workflows/daily-brief.yml   # (Phase 3) the daily run; workflow_dispatch only, no cron
@@ -50,7 +50,7 @@ docs/                      # architecture, data sources, ADRs
 - `.env.example` must always stay up to date — add new vars there whenever you add them to `config.py`.
 - Never hardcode an API key or secret in code.
 - Never print a full secret value in logs.
-- `config/portfolio.json` (the real portfolio) is gitignored; only `config/portfolio.example.json` is tracked.
+- `config/portfolio.json` (the real portfolio) and `data/vocabulary.txt` (the real word list) are gitignored; only the `.example` files are tracked. Both are restored on the runner from repository secrets.
 
 ## Git & Commit Rules (Conventional Commits)
 `feat:` new feature · `fix:` bug fix · `test:` add/update tests · `docs:` documentation · `chore:` deps/config · `refactor:` behavior-preserving cleanup

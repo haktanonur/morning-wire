@@ -62,7 +62,7 @@ modules filled in.
 | Portfolio | yfinance, symbols from a local config file | yes |
 | General news | RSS feeds | yes |
 | Sports | football-data.org | yes |
-| Vocabulary | a plain-text word list in `data/` | no — sent as written |
+| Vocabulary | a local plain-text word list | no — sent as written |
 
 Categories are independent modules under `src/app/fetchers/`; adding or removing
 one is a local change. The vocabulary category skips the model on purpose: the
@@ -144,7 +144,12 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 pre-commit install
 cp config/portfolio.example.json config/portfolio.json   # then edit the symbols
+cp data/vocabulary.example.txt data/vocabulary.txt       # then add your own entries
 ```
+
+Both copies are gitignored: they hold personal data, and in deployment they
+reach the runner as repository secrets rather than through the checkout. The
+`.example` files exist to show the format.
 
 Create a gitignored `.env` in the repository root. `src/app/config.py` is the
 only module that reads it.

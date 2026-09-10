@@ -14,6 +14,7 @@ build/
 # Secrets and personal data
 .env
 config/portfolio.json
+data/vocabulary.txt
 
 # Editor / OS
 .DS_Store

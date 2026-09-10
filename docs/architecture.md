@@ -86,7 +86,7 @@ missing word list costs one `[unavailable: ...]` rather than three.
 | `fetchers/market_news.py` | global market headlines | Finnhub | 1 |
 | `fetchers/general_news.py` | TR + global news | RSS (AA Gündem/Ekonomi, BBC World) | 1 |
 | `fetchers/sports.py` | football league results | football-data.org | 1 |
-| `fetchers/vocabulary.py` | parse the word list, pick the day's entries, split them into messages | `data/vocabulary.txt` (in-repo, no API) | 4 |
+| `fetchers/vocabulary.py` | parse the word list, pick the day's entries, split them into messages | `data/vocabulary.txt` (local file, no API) | 4 |
 | `summarizer.py` | turn raw data into a short Turkish summary | Anthropic Claude API | 1 |
 | `sms_text.py` | fold Turkish letters into GSM-7 so a segment holds 153 chars, not 67 | none | 2 |
 | `main.py` | orchestration, error isolation, terminal output, `--dry-run`, exit code | all of the above | 1–2 |
