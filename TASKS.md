@@ -101,6 +101,12 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - Closed with the reversals — ADR 0003 → 0007, then 0007's own 20-minute estimate against a measured 4.5 hours — kept in the repo on purpose: the reasoning is what is expensive to rediscover, and an agent reading `TASKS.md` needs to know which obvious idea was already tried.
   - No new content invented for it. Everything stated is checkable in the repo, so the section cannot drift from the code without the code changing first.
 
+- [x] TASK-026: Draw the system design. Mermaid, not draw.io.
+  - Tool choice was the real decision. A `.drawio` file is an opaque blob that no review catches drifting from the code, and it renders nowhere — a diagram that silently goes stale is worse than no diagram. Mermaid is text, so it diffs, and GitHub renders it in place. Both diagrams were run through `mermaid-cli` before committing rather than assumed to parse.
+  - Two diagrams, because one would have to choose between honest and readable. The four-box version goes in the README and answers "what is this"; the module-level version stays in `docs/architecture.md`. The four-box one makes the phone appear at *both* ends deliberately — that it starts the run and also delivers the result is the one thing readers get wrong.
+  - The Phase 2+ ASCII diagram is deleted rather than kept alongside: it drew the same flow, and two pictures of one thing is two things to update. Its unique content — the fixed message order, and the relay/reader phones being separate devices — moved into the prose under the new diagram.
+  - Both notes under the detail diagram are things arrows cannot show: that each of the five branches is its own try/except, and that the arrow into the relay is where certainty ends (`200 ok` means queued, and looks the same when the phone is off).
+
 ## Open Decisions
 - [x] Real portfolio symbol list: added by the owner to `config/portfolio.json` (gitignored, so the holdings stay out of the repo).
 - [x] SMS send time: **06:00 Istanbul**, set by a MacroDroid time trigger on the phone rather than by a cron in this repo (TASK-022). The workflow has no schedule at all, so there is no UTC conversion left to get wrong and Türkiye's fixed UTC+3 no longer enters into it. Changing the time means editing the macro, not this repository.

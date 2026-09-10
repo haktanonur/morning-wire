@@ -31,11 +31,31 @@ things that can quietly stop — the phone's token, the API credit — are worth
 setting to outlive the deployment rather than the month. What a missing brief
 means, and where to look first, is in [Part 2](#deploying-part-2-the-workflow).
 
+## How It Works
+```mermaid
+flowchart LR
+    P["Relay phone<br/>MacroDroid<br/>(has internet)"]
+    G["GitHub Actions<br/>fetch, summarize, send"]
+    S["Data sources<br/>+ Claude API"]
+    R["Reader's phone<br/>(no internet)"]
+
+    P -->|"1. 06:00 — POST /dispatches"| G
+    G <-->|"2. fetch and summarize"| S
+    G -->|"3. 7 webhook calls"| P
+    P -->|"4. 7 SMS, own SIM"| R
+```
+
+No server, no SMS provider, and nothing running on the reader's side. The phone
+appears at both ends because it is the only part of the chain that can reach
+someone offline: it starts the run, and it delivers the result from its own SIM.
+[`docs/architecture.md`](./docs/architecture.md) has the same picture with the
+modules filled in.
+
 ## Read First
 - [`CLAUDE.md`](./CLAUDE.md) / [`AGENTS.md`](./AGENTS.md) — rules every coding agent must follow in this repo, plus the Agent Loop
 - [`PLAN.md`](./PLAN.md) — architecture, categories, phases
 - [`TASKS.md`](./TASKS.md) — task backlog (work through this in order)
-- [`docs/architecture.md`](./docs/architecture.md) — component diagram
+- [`docs/architecture.md`](./docs/architecture.md) — system design diagrams and module responsibilities
 - [`docs/data-sources.md`](./docs/data-sources.md) — APIs used and their limits
 
 If you came here for how an AI agent was made to build this without the result

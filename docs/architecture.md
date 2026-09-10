@@ -1,5 +1,83 @@
 # Architecture Detail
 
+## System Design
+Four moving parts. The one worth looking at twice is that the phone appears at
+both ends: it starts the run, and it is also what delivers the result.
+
+```mermaid
+flowchart LR
+    P["Relay phone<br/>MacroDroid<br/>(has internet)"]
+    G["GitHub Actions<br/>fetch, summarize, send"]
+    S["Data sources<br/>+ Claude API"]
+    R["Reader's phone<br/>(no internet)"]
+
+    P -->|"1. 06:00 — POST /dispatches"| G
+    G <-->|"2. fetch and summarize"| S
+    G -->|"3. 7 webhook calls"| P
+    P -->|"4. 7 SMS, own SIM"| R
+```
+
+There is no server anywhere in that picture, and nothing in it runs on the
+reader's side. Step 1 is a *request* rather than a scheduled job, which is the
+whole reason the brief arrives at 06:00 — see
+[`0007`](./adr/0007-github-actions-over-aws-lambda.md).
+
+The two phones are one device when you run this for yourself, and **two devices
+in the deployed setup**: the reader has no internet, so the relay is a friend's
+phone holding both macros. The seven messages arrive in a fixed order — markets,
+portfolio, news, sports, then vocabulary 1/3 to 3/3. See README "When the phone
+belongs to someone else".
+
+## Inside One Run
+About a minute, start to finish.
+
+```mermaid
+flowchart TD
+    TRIG["MacroDroid time trigger<br/>06:00 Istanbul"]
+
+    subgraph RUN["GitHub Actions runner"]
+        MAIN["main.py<br/>orchestration"]
+        MKT["market_news — Finnhub"]
+        PRT["portfolio — yfinance"]
+        NWS["general_news — AA, BBC RSS"]
+        SPT["sports — football-data.org"]
+        VOC["vocabulary — data/vocabulary.txt"]
+        SUM["summarizer.py<br/>Claude Haiku, Turkish"]
+        TXT["sms_text.to_gsm7()"]
+        SND["sender.py"]
+    end
+
+    RELAY["MacroDroid cloud relay"]
+    MACRO["Send SMS macro<br/>on the relay phone"]
+    READER["Reader's phone"]
+
+    TRIG -->|"204, starts at once"| MAIN
+    MAIN --> MKT & PRT & NWS & SPT & VOC
+    MKT & PRT & NWS & SPT --> SUM
+    SUM --> TXT
+    VOC --> TXT
+    TXT --> SND
+    SND -->|"7 HTTPS calls"| RELAY
+    RELAY -->|"push"| MACRO
+    MACRO -->|"7 SMS"| READER
+```
+
+Two things the arrows are hiding:
+
+- **Each of the five branches is its own try/except.** A dead API costs that
+  category an `[unavailable: ...]` line and nothing else — the other four still
+  arrive. This is a rule, not an accident (`AGENTS.md`, coding rule 4).
+- **The arrow into the relay is where certainty ends.** The relay answers
+  `200 ok` as soon as it has queued a push, and answers identically when the
+  phone is off or out of SMS credit. That is why `sender.py` reports `accepted`
+  and never `delivered`, and why the brief arriving is the only real proof
+  ([`0006`](./adr/0006-macrodroid-over-twilio.md)).
+
+Vocabulary is the one branch that skips the summarizer: the entries are personal
+study notes, so there is nothing to condense and a paraphrase would be a loss
+(`PLAN.md` §4). It is also one failure boundary for three messages, so a missing
+notebook costs one `[unavailable: ...]` rather than three.
+
 ## Phase 1 Component Diagram
 ```
 CLI (python -m app.main)
@@ -17,34 +95,6 @@ summarizer. The entries are the owner's own study notes, so there is nothing to
 condense and a paraphrase would be a loss — see `PLAN.md` §4. It is also the one
 row that produces several sections from a single failure boundary, so a missing
 notebook costs one `[unavailable: ...]` rather than three.
-
-## Phase 2+ Component Diagram
-```
-MacroDroid time trigger, 06:00 Istanbul -> POST .../dispatches (not queued)
-        |
-python -m app.main   (no wrapper; the CLI is the entry point)
-        |
-        +--> [same 4 fetcher/summarizer pairs as Phase 1, then the vocabulary file]
-        |
-        +--> sender.py --> sms_text.to_gsm7() --> MacroDroid webhook
-                           --> relay Android phone sends 7 tagged SMS
-                               from its own SIM, in the order
-                               markets -> portfolio -> news -> sports
-                               -> vocab 1/3 -> 2/3 -> 3/3
-                               |
-                               v
-                           reader's phone (a different device and SIM;
-                           offline, so it only receives)
-```
-The webhook is a relay, so the arrow out of `sender.py` stops at "queued": a
-`200 ok` says nothing about whether the phone sent the message. See
-`docs/adr/0006-macrodroid-over-twilio.md`.
-
-Both boxes at the top and bottom of the phone hop are the *same* device in a
-local setup and **different devices in the deployed one**: the reader has no
-internet, so the relay phone that triggers the run and sends the SMS belongs to
-someone else. That is why the time trigger and the sending macro sit together on
-one phone — see README "When the phone belongs to someone else".
 
 ## Module Responsibilities
 | Module | Responsibility | External dependency | Phase |
