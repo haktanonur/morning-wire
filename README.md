@@ -30,18 +30,10 @@ this kind is recorded under [`docs/adr/`](./docs/adr/).
 
 ## How It Works
 
-```mermaid
-flowchart LR
-    P["Sending phone<br/>MacroDroid<br/>(has internet)"]
-    G["GitHub Actions<br/>fetch, summarize, send"]
-    S["Data sources<br/>+ Claude API"]
-    R["Receiving phone<br/>(no internet)"]
-
-    P -->|"1. timed trigger"| G
-    G <-->|"2. fetch and summarize"| S
-    G -->|"3. webhook per message"| P
-    P -->|"4. SMS from its own SIM"| R
-```
+![A timed trigger on the sending phone starts a GitHub Actions run. The run
+fetches from the data sources and summarizes through the Claude API, then calls
+a webhook on that same phone once per message, and the phone sends each one on
+as an SMS to a receiving phone that has no internet.](./docs/images/how-it-works.png)
 
 The phone appears at both ends because it is the only part of the chain that can
 reach someone offline: it starts the run, and it delivers the result. The two
