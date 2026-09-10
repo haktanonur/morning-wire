@@ -95,6 +95,12 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - The real cost is that the owner cannot debug any of it once offline: no Actions tab, no phone, and the brief arriving is the only signal left. README Part 1 now ends with a three-question checklist written for the person holding the phone (on/online → macros enabled → fire the macro by hand), plus a plain statement that the token on it is `Actions: read and write` on this repo only and cannot touch code.
   - `docs/architecture.md` had the relay phone and the reading phone as one box; they are now drawn as two, since that collapse is exactly what stops being true in deployment.
 
+- [x] TASK-025: Explain the development method in the README, now that the repository is going public.
+  - The rules were all present but only as instructions *to* an agent (`AGENTS.md`, `PLAN.md`, the ADRs). Nothing told a reader what the method was or why it holds together, which is the part a public repo is actually read for.
+  - Written as four claims rather than a description: AI appears twice and the two uses are separate; the spec exists before the code; the loop is one task per branch so `git log` is the record; and **the guardrails assume the author will forget** — `conftest.py` clearing credentials and blocking sockets, the AST read of `config.py`, strict mypy and `detect-secrets` are mechanisms rather than promises. That last one is the actual answer to "how do you let an agent write this much code", so it gets the most room.
+  - Closed with the reversals — ADR 0003 → 0007, then 0007's own 20-minute estimate against a measured 4.5 hours — kept in the repo on purpose: the reasoning is what is expensive to rediscover, and an agent reading `TASKS.md` needs to know which obvious idea was already tried.
+  - No new content invented for it. Everything stated is checkable in the repo, so the section cannot drift from the code without the code changing first.
+
 ## Open Decisions
 - [x] Real portfolio symbol list: added by the owner to `config/portfolio.json` (gitignored, so the holdings stay out of the repo).
 - [x] SMS send time: **06:00 Istanbul**, set by a MacroDroid time trigger on the phone rather than by a cron in this repo (TASK-022). The workflow has no schedule at all, so there is no UTC conversion left to get wrong and Türkiye's fixed UTC+3 no longer enters into it. Changing the time means editing the macro, not this repository.
