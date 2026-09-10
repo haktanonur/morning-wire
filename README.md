@@ -34,6 +34,9 @@ means, and where to look first, is in [Part 2](#deploying-part-2-the-workflow).
 - [`docs/architecture.md`](./docs/architecture.md) — component diagram
 - [`docs/data-sources.md`](./docs/data-sources.md) — APIs used and their limits
 
+If you came here for how an AI agent was made to build this without the result
+rotting, start at [How This Was Built](#how-this-was-built) instead.
+
 ## Status
 Phases 1–3 are done and delivering live: the brief is fetched, summarized, sent as SMS and scheduled, with no server and no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)). Scheduling is the part that did not go to plan — GitHub's cron ran hours late, so the workflow now has no schedule and the phone triggers it instead ([Part 3](#deploying-part-3-the-clock)). Phase 4 is hardening what already runs. `TASKS.md` has the exact list and the reasoning behind each item.
 
@@ -274,6 +277,61 @@ Three things do become visible, and they are personal rather than secret:
 
 If any of that is unwelcome, the fix is per item — drop the notebook from the
 repo, or accept the tickers — not a private repository.
+
+## How This Was Built
+Almost all of the code here was written by an AI agent (Claude Code), working to
+written rules rather than to conversation. The rules are the interesting part, so
+they are worth stating plainly.
+
+**AI appears twice in this project, and the two are separate.** At runtime it is
+a component: `summarizer.py` calls Claude to condense four categories into
+Turkish. Its job is deliberately narrow — fetching, formatting and sending are
+ordinary code, and the fifth category never touches the model at all. During
+development it is the author. This section is about the second one.
+
+**The method is spec-first: the rules exist before the code, and the agent reads
+them before it writes.**
+
+| File | Holds |
+|---|---|
+| [`AGENTS.md`](./AGENTS.md) | the binding rules — coding, testing, secrets, git, and the loop below |
+| [`PLAN.md`](./PLAN.md) | architecture and phases |
+| [`TASKS.md`](./TASKS.md) | the backlog, worked top to bottom |
+| [`docs/adr/`](./docs/adr/) | decisions, with the reasoning and the rejected options |
+
+[`CLAUDE.md`](./CLAUDE.md) only points at `AGENTS.md`. Copying the rules into
+both would mean maintaining them in two places, and rules that disagree with each
+other are worse than no rules.
+
+**Every task runs the same loop:** explore → plan → implement → test → `ruff` and
+`mypy` → self-review the diff → check the task off in `TASKS.md` → commit. One
+task per branch, merged with `--no-ff`, and nothing starts until the last thing
+finished. The result is that `git log` is the record: each task is one merge
+bubble, and the commit message under it says *why*, not *what* — the diff already
+says what.
+
+**The guardrails assume the author will forget.** A human says "I won't commit a
+secret"; that is a promise, not a mechanism. So:
+
+- `tests/conftest.py` deletes every real credential and blocks outbound sockets
+  before each test. A test that forgets to mock cannot quietly spend live API
+  quota or fire a real SMS — it fails.
+- The same file reads `config.py` with the AST module to find which secrets exist,
+  so the list comes from the code rather than from someone remembering to update
+  it.
+- `mypy --strict`, `ruff`, 80% coverage and `detect-secrets` run in CI and in
+  pre-commit, so the rules are enforced by something other than good intentions.
+- Per-category error isolation is a rule, not a nicety: one dead API costs one
+  `[unavailable: ...]` line, never the morning's brief.
+
+**Claims get measured, and wrong ones get written down.** The scheduler is the
+clearest example. The plan said AWS Lambda ([`0003`](./docs/adr/0003-aws-lambda-serverless.md));
+it became GitHub Actions ([`0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
+That ADR then said a cron would run within about 20 minutes; two mornings of
+measurement said 4.5 hours, so the cron was deleted and the phone became the
+clock. Each of those reversals stayed in the repo instead of being tidied away,
+because the reasoning is the part that is expensive to rediscover — and an agent
+reading `TASKS.md` next month needs to know which obvious idea was already tried.
 
 ## Getting Started With Claude Code
 Open this repo in Claude Code and start with:
