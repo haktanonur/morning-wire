@@ -107,6 +107,14 @@ No SMS, no AWS in this phase. Goal: run `python -m app.main` and see all 4 categ
   - The Phase 2+ ASCII diagram is deleted rather than kept alongside: it drew the same flow, and two pictures of one thing is two things to update. Its unique content — the fixed message order, and the relay/reader phones being separate devices — moved into the prose under the new diagram.
   - Both notes under the detail diagram are things arrows cannot show: that each of the five branches is its own try/except, and that the arrow into the relay is where certainty ends (`200 ok` means queued, and looks the same when the phone is off).
 
+- [x] TASK-027: Make the README general rather than personal, and name the development approach.
+  - The README had grown into two documents wearing one hat: an introduction, and a MacroDroid/GitHub setup manual with tab-by-tab tables. 369 lines, and a reader wanting to know *what this is* had to scroll past `{lv=name}` syntax to find out. The setup half moved to `docs/deployment.md` unchanged in substance; the README is now 224 lines and stops at the point where detail starts.
+  - Removed the owner from the text. "The owner's own study notes", "your own number", `06:00 Istanbul` as though it were part of the design — none of that is true of the project, only of one deployment of it. Delivery time is now stated as a setting, with 06:00 kept as the example in `docs/deployment.md` where an example is useful. The same pass went through `docs/architecture.md` and `docs/data-sources.md`.
+  - Added a **Development Approach** section, since spec-driven and AI-assisted development are the parts of this repo worth reading and were previously only implied. It separates the two uses of AI that get conflated: Claude as a runtime component that summarizes text, and an agent as the author of the code. Subsections cover the spec files, the task loop, the guardrails, and why reversals are kept.
+  - Dropped the "Making This Repository Public" section entirely. It was a decision log for one person's choice, not documentation; the audit behind it is in TASK-023.
+  - Deleted the Phase 1 ASCII diagram from `docs/architecture.md` for the same reason as TASK-026 — it drew what the Mermaid diagram above it already draws.
+  - Verified rather than assumed: both Mermaid diagrams re-rendered through `mermaid-cli`, and a link checker run over all four docs for dead anchors, missing files and cross-file anchors. All clean.
+
 ## Open Decisions
 - [x] Real portfolio symbol list: added by the owner to `config/portfolio.json` (gitignored, so the holdings stay out of the repo).
 - [x] SMS send time: **06:00 Istanbul**, set by a MacroDroid time trigger on the phone rather than by a cron in this repo (TASK-022). The workflow has no schedule at all, so there is no UTC conversion left to get wrong and Türkiye's fixed UTC+3 no longer enters into it. Changing the time means editing the macro, not this repository.

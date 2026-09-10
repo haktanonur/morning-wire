@@ -5,10 +5,10 @@ name: Daily Brief
 # scheduler the repo already had won over the one that needed four more tasks.
 on:
   # There is deliberately no `schedule:` here any more, and it should not be
-  # added back. The clock now lives on the owner's phone: a MacroDroid time
-  # trigger POSTs to this workflow's dispatch endpoint at 06:00 Istanbul, and
+  # added back. The clock now lives on the sending phone: a MacroDroid time
+  # trigger POSTs to this workflow's dispatch endpoint at the delivery time, and
   # the run starts immediately because a dispatch is a request rather than a
-  # queued job. README "Deploying, Part 3" has the setup.
+  # queued job. docs/deployment.md Part 3 has the setup.
   #
   # The cron was removed on evidence, not preference. It ran at "0 3 * * *" and
   # started 4h34m late; moved to "47 2 * * *" it started at the *same* minute
