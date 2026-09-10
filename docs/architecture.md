@@ -27,14 +27,24 @@ python -m app.main   (no wrapper; the CLI is the entry point)
         +--> [same 4 fetcher/summarizer pairs as Phase 1, then the vocabulary file]
         |
         +--> sender.py --> sms_text.to_gsm7() --> MacroDroid webhook
-                           --> owner's Android phone sends 7 tagged SMS
+                           --> relay Android phone sends 7 tagged SMS
                                from its own SIM, in the order
                                markets -> portfolio -> news -> sports
                                -> vocab 1/3 -> 2/3 -> 3/3
+                               |
+                               v
+                           reader's phone (a different device and SIM;
+                           offline, so it only receives)
 ```
 The webhook is a relay, so the arrow out of `sender.py` stops at "queued": a
 `200 ok` says nothing about whether the phone sent the message. See
 `docs/adr/0006-macrodroid-over-twilio.md`.
+
+Both boxes at the top and bottom of the phone hop are the *same* device in a
+local setup and **different devices in the deployed one**: the reader has no
+internet, so the relay phone that triggers the run and sends the SMS belongs to
+someone else. That is why the time trigger and the sending macro sit together on
+one phone — see README "When the phone belongs to someone else".
 
 ## Module Responsibilities
 | Module | Responsibility | External dependency | Phase |
@@ -48,7 +58,7 @@ The webhook is a relay, so the arrow out of `sender.py` stops at "queued": a
 | `summarizer.py` | turn raw data into a short Turkish summary | Anthropic Claude API | 1 |
 | `sms_text.py` | fold Turkish letters into GSM-7 so a segment holds 153 chars, not 67 | none | 2 |
 | `main.py` | orchestration, error isolation, terminal output, `--dry-run`, exit code | all of the above | 1–2 |
-| `sender.py` | SMS delivery | MacroDroid webhook (owner's phone) | 2 |
+| `sender.py` | SMS delivery | MacroDroid webhook (the relay phone — not necessarily the reader's) | 2 |
 
 There is no `lambda_handler.py` row any more: `docs/adr/0007` replaced Lambda with a scheduled GitHub Actions workflow, which runs `main.py` directly.
 

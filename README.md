@@ -92,7 +92,7 @@ One line per category — which one, how long, and how long its summary came out
 ## Deploying, Part 1: The Phone
 Do this first — it is what produces `MACRODROID_TRIGGER_URL`, and nothing else can be configured without it.
 
-There is no SMS provider. The brief is sent by an Android phone you own, from its own SIM, driven by a [MacroDroid](https://www.macrodroid.com/) macro. Twilio and NetGSM were both evaluated and rejected — see [`docs/adr/0006`](./docs/adr/0006-macrodroid-over-twilio.md), the short version being that both ask a one-person project to register as a business.
+There is no SMS provider. The brief is sent by an Android phone from its own SIM, driven by a [MacroDroid](https://www.macrodroid.com/) macro. That phone is not necessarily yours — see [When the phone belongs to someone else](#when-the-phone-belongs-to-someone-else), which is the normal case here. Twilio and NetGSM were both evaluated and rejected — see [`docs/adr/0006`](./docs/adr/0006-macrodroid-over-twilio.md), the short version being that both ask a one-person project to register as a business.
 
 **1. Create the variable before the macro.** In MacroDroid, go to **Variables** and add a **global string** variable named exactly `message`, lowercase. This step is not optional and not reorderable: MacroDroid matches an incoming query parameter to a variable *by name*, and it will not create one that does not already exist. Get the name wrong and nothing errors — the macro runs, the relay answers `ok`, and an empty SMS arrives.
 
@@ -118,6 +118,46 @@ curl "https://trigger.macrodroid.com/<device-id>/<trigger-name>?message=test"
 ```
 
 The phone should buzz. Watch the phone, not the response: the endpoint is a cloud relay that answers `ok` as soon as it has queued a push, and it answers exactly the same way when the phone is off, out of credit, or missing the SMS permission. That is why `sender.py` reports `accepted` and never `delivered`, and it is the one hop no log in this project can see.
+
+### When the phone belongs to someone else
+The reason this project exists is also the reason the sending phone usually
+cannot be the reading phone: someone with no internet cannot host the macro that
+fetches the brief. So the phone above is a **relay** — a friend's Android, awake
+and online, sending to a number that is not its own. Both macros go on it: this
+one, and the 06:00 trigger in [Part 3](#deploying-part-3-the-clock).
+
+Everything in Part 1 still applies, with the recipient field holding *your*
+number rather than theirs. Four things change, and the first is the one that
+actually breaks deployments:
+
+- **The SMS is billed to their line.** Five categories are 7 messages a day,
+  around 210 a month, every month, to a number outside their plan's own
+  network. Check the bundle before anything else — a plan that runs out mid-month
+  fails exactly like a dead macro, silently, and it is not a favour worth
+  discovering by accident.
+- **A new device means a new webhook URL.** `MACRODROID_TRIGGER_URL` in `.env`
+  and in the repository secret must be re-copied from *their* phone; the old URL
+  keeps answering `ok` and keeps making the wrong phone buzz.
+- **Their phone must survive a reboot.** Battery optimisation is not enough on
+  its own — MacroDroid also needs autostart permission, or the macros come back
+  disarmed after a restart with nothing to indicate it. Test by rebooting the
+  phone and then firing the `curl` above.
+- **You will not be able to debug it.** Once you are offline, the arrival of the
+  brief is the only signal you have, and the Actions tab and the phone are both
+  out of reach. Leave them the checklist below; it is short on purpose.
+
+**For the person holding the phone,** if a morning goes missing: is the phone on
+and online, is MacroDroid still running (open it and check the macros are
+enabled), and does firing the webhook macro by hand send a test SMS? Those three
+cover nearly everything. If all three pass, the problem is upstream on GitHub —
+usually the token having expired — and that needs the repository owner.
+
+The token that lives on that phone is scoped to this repository with
+`Actions: read and write` and nothing else, so the worst it can do in the wrong
+hands is send an unwanted briefing. It cannot read or change code. That is worth
+saying plainly to whoever is keeping the phone, and it is worth choosing the
+longest expiry available when you create it, because nobody will be in a
+position to replace it.
 
 ## Deploying, Part 2: The Workflow
 `.github/workflows/daily-brief.yml` runs the brief and is the entire deployment — no server, no AWS ([`docs/adr/0007`](./docs/adr/0007-github-actions-over-aws-lambda.md)).
