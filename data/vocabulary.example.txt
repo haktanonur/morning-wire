@@ -1,0 +1,45 @@
+KELİME VE KALIP DEFTERİ — ÖRNEK
+Toplam bölüm: 1 | Toplam kelime: 6
+
+Bu dosya biçimi göstermek içindir. Gerçek liste `data/vocabulary.txt`
+dosyasında tutulur; o dosya gitignore edilmiştir ve dağıtımda
+`VOCABULARY_TXT_GZ` secret'ından yazılır — bkz. `docs/deployment.md`.
+
+Bir kayıt dört satırdır: terim kendi satırında, ardından girintili üç alan
+(`Türkçe`, `Not`, `Örnek`) bu sırayla. Başlıklar, ayraç satırları ve boş
+satırlar bu kalıba uymadığı için ayrıştırıcı tarafından atlanır — yani
+bölümleri istediğiniz gibi düzenleyebilirsiniz.
+
+======================================================================
+Bölüm 1 — Örnek Bölüm
+======================================================================
+
+back down
+  Türkçe : geri adım atmak
+  Not    : Bir iddiadan ya da talepten vazgeçmek anlamında kullanılır.
+  Örnek  : The company refused to back down after the deadline passed.
+
+bottleneck
+  Türkçe : darboğaz
+  Not    : Bir süreci yavaşlatan tek nokta; teknik metinlerde çok geçer.
+  Örnek  : Disk access turned out to be the real bottleneck.
+
+due diligence
+  Türkçe : gerekli özen, ön inceleme
+  Not    : Özellikle yatırım ve satın alma süreçlerinde kalıp olarak kullanılır.
+  Örnek  : They ran due diligence before signing the agreement.
+
+rule of thumb
+  Türkçe : genel kural, pratik ölçüt
+  Not    : Kesin olmayan ama işe yarayan kaba kural.
+  Örnek  : As a rule of thumb, keep the summary under four sentences.
+
+trade-off
+  Türkçe : ödünleşim, bir şeyden vazgeçerek başka bir şey kazanma
+  Not    : Mühendislik kararlarını anlatırken sürekli kullanılır.
+  Örnek  : Every caching strategy is a trade-off between speed and freshness.
+
+workaround
+  Türkçe : geçici çözüm
+  Not    : Sorunu kökten çözmeyen, etrafından dolaşan çözüm.
+  Örnek  : We shipped a workaround until the upstream bug is fixed.

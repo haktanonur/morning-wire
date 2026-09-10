@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_VOCABULARY_PATH = Path(__file__).resolve().parents[3] / "data" / "vocabulary.txt"
 
+# The real list is personal and gitignored, so it is absent from a fresh
+# checkout. This one is tracked, and is the only in-repo record of the format
+# the parser expects.
+EXAMPLE_VOCABULARY_PATH = Path(__file__).resolve().parents[3] / "data" / "vocabulary.example.txt"
+
 WORDS_PER_DAY = 15
 
 # Fifteen entries render to roughly 2,300 characters, which is about 3,300 once

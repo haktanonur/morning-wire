@@ -122,11 +122,31 @@ Actions**:
 | `FOOTBALL_DATA_API_KEY` | as in `.env` |
 | `MACRODROID_TRIGGER_URL` | as in `.env` — the webhook URL from Part 1 |
 | `PORTFOLIO_JSON` | the **contents** of `config/portfolio.json` |
+| `VOCABULARY_TXT_GZ` | `data/vocabulary.txt`, gzipped and base64-encoded (below) |
 
-`PORTFOLIO_JSON` is the one that is easy to miss: the real portfolio file is
-gitignored, so it is not in the runner's checkout and the workflow writes it back
-from this secret. Without it the portfolio section reads `[unavailable: ...]`
+The last two exist because both files hold personal data, are gitignored, and are
+therefore missing from the runner's checkout. The workflow writes them back from
+these secrets. Forget either one and that category reads `[unavailable: ...]`
 every morning while everything else looks fine.
+
+The word list is encoded rather than pasted because an Actions secret is capped
+at **48 KB** and a few hundred entries exceed that as plain text. Produce the
+value with:
+
+```bash
+gzip -9 -c data/vocabulary.txt | base64 | pbcopy   # Linux: | xclip -selection clipboard
+```
+
+and paste it as the secret. Check the round trip before trusting it:
+
+```bash
+gzip -9 -c data/vocabulary.txt | base64 | base64 --decode | gunzip | cmp - data/vocabulary.txt
+```
+
+Silence means the two are identical. **Re-do this whenever you edit the list** —
+the deployed brief reads the secret, not your local file, so an edit that is not
+re-uploaded simply never arrives. If `base64` reports the value is too large,
+the list has outgrown the 48 KB cap and needs splitting or trimming.
 
 Run it by hand from the Actions tab — "Run workflow", with **Run the pipeline but
 send no SMS** ticked for a dry run.
