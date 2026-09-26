@@ -180,23 +180,32 @@ def test_the_whole_pipeline_delivers_four_tagged_folded_summaries(
     ]
 
 
-def test_the_vocabulary_arrives_as_three_numbered_messages(
+def test_the_vocabulary_arrives_as_numbered_messages(
     world: responses.RequestsMock,
 ) -> None:
-    """Fifteen entries, split across messages, numbered continuously through the day.
+    """The day's entries, split across messages, numbered continuously through the day.
 
     The numbering is the assertion that matters: it is what tells the reader on
-    the phone that nothing went missing between message 1 and message 3.
+    the phone that nothing went missing between the first message and the last.
+
+    Every count is derived from ``WORDS_PER_DAY`` rather than written out,
+    because these two constants are expected to move: the day's word count has
+    already been tuned once against the number of SMS the brief can afford.
     """
     main([])
 
     vocabulary = _sent_messages(world)[4:]
+    expected_messages = WORDS_PER_DAY // WORDS_PER_MESSAGE
+    last_word = WORDS_PER_DAY - WORDS_PER_MESSAGE + 1
 
-    assert len(vocabulary) == WORDS_PER_DAY // WORDS_PER_MESSAGE
-    assert vocabulary[0].startswith("[VOCAB 1/3] 1. word01\n= agir cikis\n* not01\n> example01")
-    assert vocabulary[1].startswith("[VOCAB 2/3] 6. word06")
-    assert vocabulary[2].startswith("[VOCAB 3/3] 11. word11")
-    assert [body.count("\n= ") for body in vocabulary] == [WORDS_PER_MESSAGE] * 3
+    assert len(vocabulary) == expected_messages
+    assert vocabulary[0].startswith(
+        f"[VOCAB 1/{expected_messages}] 1. word01\n= agir cikis\n* not01\n> example01"
+    )
+    assert vocabulary[-1].startswith(
+        f"[VOCAB {expected_messages}/{expected_messages}] {last_word}. word{last_word:02d}"
+    )
+    assert [body.count("\n= ") for body in vocabulary] == [WORDS_PER_MESSAGE] * expected_messages
 
 
 def test_the_vocabulary_is_never_shown_to_the_model(
@@ -273,7 +282,7 @@ def test_a_relay_failure_turns_the_run_red_without_losing_the_report(
         assert main([]) == 1
 
     assert "=== PORTFOLIO ===" in capsys.readouterr().out
-    assert "SMS relay accepted 0/7" in caplog.text
+    assert f"SMS relay accepted 0/{4 + WORDS_PER_DAY // WORDS_PER_MESSAGE}" in caplog.text
 
 
 def test_the_run_log_accounts_for_every_category(
@@ -292,6 +301,7 @@ def test_the_run_log_accounts_for_every_category(
         "PORTFOLIO ok in 0.0s, 21 chars.",
         "NEWS ok in 0.0s, 23 chars.",
         "SPORTS ok in 0.0s, 24 chars.",
-        "VOCAB ok in 0.0s, 15 words over 3 messages.",
-        "SMS relay accepted all 7 categories.",
+        f"VOCAB ok in 0.0s, {WORDS_PER_DAY} words over "
+        f"{WORDS_PER_DAY // WORDS_PER_MESSAGE} messages.",
+        f"SMS relay accepted all {4 + WORDS_PER_DAY // WORDS_PER_MESSAGE} categories.",
     ]

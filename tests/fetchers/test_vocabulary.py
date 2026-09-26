@@ -158,7 +158,7 @@ def test_consecutive_days_do_not_overlap() -> None:
 
 
 def test_the_wrap_at_the_end_still_gives_a_full_day() -> None:
-    """449 is not a multiple of 15, so one day a month straddles the end."""
+    """449 is not a multiple of the daily count, so one day per cycle straddles the end."""
     notebook = _entries(20)
 
     chosen = select_for_day(notebook, date(2026, 9, 7), count=WORDS_PER_DAY)
@@ -167,14 +167,21 @@ def test_the_wrap_at_the_end_still_gives_a_full_day() -> None:
     assert len(set(chosen)) == WORDS_PER_DAY, "a short notebook must not repeat within one day"
 
 
-def test_a_month_of_runs_covers_the_whole_notebook() -> None:
-    """The only guarantee that no word is stranded: 15 and 449 share no factor."""
+def test_a_full_cycle_of_runs_covers_the_whole_notebook() -> None:
+    """The only guarantee that no word is stranded: 449 is prime, so nothing divides it.
+
+    The cycle is ``ceil(449 / WORDS_PER_DAY)`` days, which is 45 at ten a day and
+    was 30 at fifteen. Deriving it rather than writing a number keeps the test
+    honest if the daily count moves again — hard-coding 30 is exactly how this
+    assertion silently stopped covering the notebook when it dropped to ten.
+    """
     notebook = _entries(449)
     start = date(2026, 9, 7)
+    cycle_days = -(-len(notebook) // WORDS_PER_DAY)
 
     seen = {
         entry
-        for offset in range(30)
+        for offset in range(cycle_days)
         for entry in select_for_day(notebook, start + timedelta(days=offset))
     }
 

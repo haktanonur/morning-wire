@@ -11,9 +11,10 @@ Which entries go out is a pure function of the date. Nothing is stored between
 runs — the scheduled job runs on a fresh runner every morning, so any cursor
 would have to be committed back into the repository or cached, and neither is
 worth it for a notebook meant to be read round and round. Advancing the offset
-by ``WORDS_PER_DAY`` a day walks the whole file before repeating, because 15 and
-449 share no common factor, and then starts again. For vocabulary that second
-pass is revision rather than a defect.
+by ``WORDS_PER_DAY`` a day walks the whole file before repeating, because the
+notebook's length is prime and so shares no factor with any day's count, and
+then starts again. For vocabulary that second pass is revision rather than a
+defect.
 """
 
 from __future__ import annotations
@@ -32,16 +33,20 @@ DEFAULT_VOCABULARY_PATH = Path(__file__).resolve().parents[3] / "data" / "vocabu
 # the parser expects.
 EXAMPLE_VOCABULARY_PATH = Path(__file__).resolve().parents[3] / "data" / "vocabulary.example.txt"
 
-WORDS_PER_DAY = 15
+# Ten rather than fifteen: the brief gained two new categories, and the
+# vocabulary was the only one costing three SMS. Ten costs two, which is what
+# the extra categories needed back. It also has to stay a whole multiple of
+# WORDS_PER_MESSAGE, or the last message of the day goes out short.
+WORDS_PER_DAY = 10
 
-# Fifteen entries render to roughly 2,300 characters, which is about 3,300 once
-# percent-encoded into the trigger URL's query string. The SMS itself does not
-# care — the messages come off the owner's own SIM (docs/adr/0006) — but the URL
-# does: the relay is a third party with an unpublished request-line limit, and
-# the failure mode if it has one is the worst kind, because it answers "200 ok"
-# whether or not the whole parameter survived. Five entries a message keeps each
-# URL near 1,100 characters, far inside anything plausible, and reads better on
-# a phone than one eighteen-segment wall of text.
+# The whole day at once would be one very long query parameter, and the URL is
+# the real constraint here rather than the SMS: the messages come off the
+# owner's own SIM (docs/adr/0006), but the relay is a third party with an
+# unpublished request-line limit, and the failure mode if it has one is the
+# worst kind, because it answers "200 ok" whether or not the whole parameter
+# survived. Five entries measures ~810 characters, about 1,340 percent-encoded,
+# which is far inside anything plausible and reads better on a phone than one
+# wall of text.
 WORDS_PER_MESSAGE = 5
 
 # The field labels used by the notebook, which is written and maintained by hand.
