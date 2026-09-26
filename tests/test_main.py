@@ -17,9 +17,12 @@ from app.main import (
 from app.sender import SendOutcome
 from app.summarizer import SummarizationError
 
+# Each category as a (source, renderer) pair. The renderer is the summarizer
+# for three of them and ``render_portfolio`` for the fourth, which is the one
+# category that turns its data into text without asking the model.
 CATEGORY_PATCHES = {
     "MARKETS": ("app.main.fetch_market_news", "app.main.summarize_markets"),
-    "PORTFOLIO": ("app.main.load_portfolio", "app.main.summarize_portfolio"),
+    "PORTFOLIO": ("app.main.load_portfolio", "app.main.render_portfolio"),
     "NEWS": ("app.main.fetch_general_news", "app.main.summarize_news"),
     "SPORTS": ("app.main.fetch_sports", "app.main.summarize_sports"),
 }
@@ -32,15 +35,15 @@ VOCABULARY_HEADINGS = ["VOCAB 1/2", "VOCAB 2/2"]
 
 @pytest.fixture(autouse=True)
 def _no_external_calls(mocker: MockerFixture) -> None:
-    """Mock every fetcher and summarizer so no test can reach the network.
+    """Mock every fetcher and renderer so no test can reach the network.
 
     The vocabulary is stubbed too, even though it only reads a committed file:
     these tests are about `main`'s wiring, and a real notebook read would tie
     their expected output to whatever was last appended to it.
     """
-    for fetch_target, summarize_target in CATEGORY_PATCHES.values():
+    for fetch_target, render_target in CATEGORY_PATCHES.values():
         mocker.patch(fetch_target, return_value=["raw"])
-        mocker.patch(summarize_target, return_value="A tidy summary.")
+        mocker.patch(render_target, return_value="A tidy summary.")
     mocker.patch("app.main.fetch_portfolio_prices", return_value=["raw"])
     mocker.patch("app.main.daily_messages", return_value=VOCABULARY_BODIES)
 
@@ -67,7 +70,7 @@ def test_build_report_returns_every_section_in_send_order() -> None:
     ]
 
 
-def test_build_report_fills_every_summarized_section_with_its_summary() -> None:
+def test_build_report_fills_every_section_with_its_rendered_body() -> None:
     sections = {section.heading: section.body for section in build_report()}
 
     assert [sections[heading] for heading in CATEGORY_PATCHES] == ["A tidy summary."] * 4

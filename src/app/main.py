@@ -1,9 +1,10 @@
 """CLI entrypoint: fetch, summarize, print and send the whole briefing.
 
-Four categories are fetched and summarized — markets, portfolio, news, sports —
-and a fifth, the English vocabulary, is read straight off disk and sent
-unsummarized, because those entries are the owner's own study notes and the
-model has nothing to add to them.
+Three categories are fetched and summarized — markets, news, sports — and two
+are not: the portfolio is rendered from the prices themselves, and the English
+vocabulary is read straight off disk. Neither reaches the model, because in
+both cases the data is already what the reader wants and a restatement could
+only be wrong.
 
 
 Run with ``python -m app.main`` to send the briefing as SMS, or
@@ -34,14 +35,13 @@ from dataclasses import dataclass
 
 from app.fetchers.general_news import fetch_general_news
 from app.fetchers.market_news import fetch_market_news
-from app.fetchers.portfolio import fetch_portfolio_prices, load_portfolio
+from app.fetchers.portfolio import fetch_portfolio_prices, load_portfolio, render_portfolio
 from app.fetchers.sports import fetch_sports
 from app.fetchers.vocabulary import WORDS_PER_DAY, daily_messages
 from app.sender import SendOutcome, send_report
 from app.summarizer import (
     summarize_markets,
     summarize_news,
-    summarize_portfolio,
     summarize_sports,
 )
 
@@ -66,7 +66,7 @@ def _markets() -> str:
 
 
 def _portfolio() -> str:
-    return summarize_portfolio(fetch_portfolio_prices(load_portfolio()))
+    return render_portfolio(fetch_portfolio_prices(load_portfolio()))
 
 
 def _news() -> str:

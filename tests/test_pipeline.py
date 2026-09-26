@@ -39,12 +39,20 @@ from app.sender import MESSAGE_PARAM
 
 TRIGGER_URL = "https://trigger.macrodroid.com/fake-device-id/daily-sms-bot"
 
-# One ASCII word planted in each category's source data. The stubbed model
-# echoes back whichever one it was given, which is what lets a single assertion
-# prove that this category's data travelled through this category's prompt and
-# came out in this category's SMS. They are kept free of Turkish letters so the
-# expected strings below stay readable after the fold.
-MARKERS = ("Fed", "TSLA", "Meclis", "Arsenal")
+# One ASCII word planted in each summarized category's source data. The stubbed
+# model echoes back whichever one it was given, which is what lets a single
+# assertion prove that this category's data travelled through this category's
+# prompt and came out in this category's SMS. They are kept free of Turkish
+# letters so the expected strings below stay readable after the fold.
+#
+# There is no marker for the portfolio: it is rendered from the prices rather
+# than summarized, so it never passes through a prompt at all and is asserted
+# against its own numbers instead.
+MARKERS = ("Fed", "Meclis", "Arsenal")
+
+# What the stubbed yfinance handle below works out to once rendered: a close of
+# 412.00 against a previous 400.00 is +3.00%, under both headings.
+EXPECTED_PORTFOLIO = "Portfoy:\nTesla 412.00 +3.00%\nPiyasa:\nS&P 500 412.00 +3.00%"
 
 
 def _notebook(count: int) -> str:
@@ -90,10 +98,17 @@ def world(mocker: MockerFixture, tmp_path: Path) -> Iterator[responses.RequestsM
         mocker.patch.dict("os.environ", {name: f"fake-{name.lower()}"})
     mocker.patch.dict("os.environ", {"MACRODROID_TRIGGER_URL": TRIGGER_URL})
 
-    # Real file, real JSON parsing, just not the owner's real holdings.
+    # Real file, real JSON parsing, just not the owner's real holdings. Both
+    # groups are populated so the rendered split is exercised end to end.
     config_path = tmp_path / "portfolio.json"
     config_path.write_text(
-        json.dumps({"symbols": [{"ticker": "TSLA", "label": "Tesla"}]}), encoding="utf-8"
+        json.dumps(
+            {
+                "holdings": [{"ticker": "TSLA", "label": "Tesla"}],
+                "indices": [{"ticker": "^GSPC", "label": "S&P 500"}],
+            }
+        ),
+        encoding="utf-8",
     )
     mocker.patch("app.fetchers.portfolio.DEFAULT_PORTFOLIO_PATH", config_path)
 
@@ -158,7 +173,7 @@ def _sent_messages(http: responses.RequestsMock) -> list[str]:
     return [parse_qs(query)[MESSAGE_PARAM][0] for query in queries]
 
 
-def test_the_whole_pipeline_delivers_four_tagged_folded_summaries(
+def test_the_whole_pipeline_delivers_four_tagged_folded_categories(
     world: responses.RequestsMock,
 ) -> None:
     """Source data in, SMS out, with nothing between the two mocked.
@@ -167,14 +182,15 @@ def test_the_whole_pipeline_delivers_four_tagged_folded_summaries(
     çıktı." folded to ASCII is exactly this, and writing it by hand is what
     makes a regression in the fold visible instead of self-consistent.
 
-    Only the four summarized categories are checked here; the vocabulary that
-    follows them has its own test below.
+    Three of the four are summaries; the portfolio is the one that is rendered
+    from its own prices, and it takes the same tag, order and fold as the rest.
+    The vocabulary that follows them has its own test below.
     """
     assert main([]) == 0
 
     assert _sent_messages(world)[:4] == [
         "[MARKETS] Bugun Fed one cikti.",
-        "[PORTFOLIO] Bugun TSLA one cikti.",
+        f"[PORTFOLIO] {EXPECTED_PORTFOLIO}",
         "[NEWS] Bugun Meclis one cikti.",
         "[SPORTS] Bugun Arsenal one cikti.",
     ]
@@ -213,14 +229,15 @@ def test_the_vocabulary_is_never_shown_to_the_model(
 ) -> None:
     """The entries are the owner's own notes, and a "helpful" rewrite would be a loss.
 
-    Four API calls, one per summarized category, and none for the vocabulary.
+    Three API calls, one per summarized category, and none for the vocabulary
+    or the portfolio — the two sections whose data is already the answer.
     """
     main([])
 
     from app.summarizer import anthropic
 
     create = anthropic.Anthropic().messages.create
-    assert create.call_count == 4
+    assert create.call_count == 3
     assert not any("word01" in call.kwargs["messages"][0]["content"] for call in create.mock_calls)
 
 
@@ -232,7 +249,7 @@ def test_the_terminal_report_keeps_the_turkish_the_sms_gives_up(
 
     printed = capsys.readouterr().out
     assert "=== MARKETS ===\nBugün Fed öne çıktı." in printed
-    assert printed.count("öne çıktı") == 4
+    assert printed.count("öne çıktı") == 3
 
 
 def test_a_dead_source_costs_only_its_own_category(
@@ -254,7 +271,7 @@ def test_a_dead_source_costs_only_its_own_category(
     markets, portfolio, news, sports = _sent_messages(world)[:4]
     assert markets == "[MARKETS] Bugun icin veri yok."
     assert sports == "[SPORTS] Bugun kayda deger bir sonuc yok."
-    assert portfolio == "[PORTFOLIO] Bugun TSLA one cikti."
+    assert portfolio == f"[PORTFOLIO] {EXPECTED_PORTFOLIO}"
     assert news == "[NEWS] Bugun Meclis one cikti."
 
 
@@ -264,7 +281,7 @@ def test_dry_run_builds_the_whole_report_and_still_sends_nothing(
     assert main(["--dry-run"]) == 0
 
     assert _sent_messages(world) == []
-    assert capsys.readouterr().out.count("öne çıktı") == 4
+    assert capsys.readouterr().out.count("öne çıktı") == 3
 
 
 def test_a_relay_failure_turns_the_run_red_without_losing_the_report(
@@ -298,7 +315,7 @@ def test_the_run_log_accounts_for_every_category(
 
     assert [record.getMessage() for record in caplog.records] == [
         "MARKETS ok in 0.0s, 20 chars.",
-        "PORTFOLIO ok in 0.0s, 21 chars.",
+        f"PORTFOLIO ok in 0.0s, {len(EXPECTED_PORTFOLIO)} chars.",
         "NEWS ok in 0.0s, 23 chars.",
         "SPORTS ok in 0.0s, 24 chars.",
         f"VOCAB ok in 0.0s, {WORDS_PER_DAY} words over "

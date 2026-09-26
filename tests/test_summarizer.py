@@ -8,7 +8,6 @@ from pytest_mock import MockerFixture
 
 from app.fetchers.general_news import REGION_TR, REGION_WORLD, Article
 from app.fetchers.market_news import Headline
-from app.fetchers.portfolio import PortfolioQuote
 from app.fetchers.sports import NOTHING_NOTABLE, MatchResult
 from app.summarizer import (
     MAX_SUMMARY_CHARS,
@@ -17,7 +16,6 @@ from app.summarizer import (
     SummarizationError,
     summarize_markets,
     summarize_news,
-    summarize_portfolio,
     summarize_sports,
 )
 
@@ -93,11 +91,6 @@ def test_summarize_markets_returns_no_data_without_calling_the_api(create: Any) 
     create.assert_not_called()
 
 
-def test_summarize_portfolio_returns_no_data_without_calling_the_api(create: Any) -> None:
-    assert summarize_portfolio([]) == NO_DATA
-    create.assert_not_called()
-
-
 def test_summarize_news_returns_no_data_without_calling_the_api(create: Any) -> None:
     assert summarize_news([]) == NO_DATA
     create.assert_not_called()
@@ -118,19 +111,6 @@ def test_summarize_markets_sends_headlines_and_returns_the_summary(create: Any) 
     assert "Fed holds rates steady" in prompt
     assert "Reuters" in prompt
     assert "not about markets" in prompt
-
-
-def test_summarize_portfolio_renders_prices_and_missing_symbols(create: Any) -> None:
-    summarize_portfolio(
-        [
-            PortfolioQuote(ticker="TSLA", label="Tesla", close=250.1, change_pct=-1.234),
-            PortfolioQuote(ticker="GC=F", label="Gold (USD/oz)", close=None, change_pct=None),
-        ]
-    )
-
-    prompt = _sent_prompt(create)
-    assert "Tesla (TSLA): close 250.10, change -1.23%" in prompt
-    assert "Gold (USD/oz) (GC=F): no data" in prompt
 
 
 def test_summarize_news_groups_the_two_regions_separately(create: Any) -> None:
@@ -191,7 +171,6 @@ def test_summarize_trims_an_overlong_summary_at_a_sentence_boundary(create: Any)
     ("summarize", "argument", "category"),
     [
         (summarize_markets, [_headline()], "MARKETS"),
-        (summarize_portfolio, [PortfolioQuote("TSLA", "Tesla", 250.0, 1.5)], "PORTFOLIO"),
         (summarize_news, [_article()], "NEWS"),
         (summarize_sports, _matches(), "SPORTS"),
     ],
@@ -231,7 +210,7 @@ def test_summarize_does_not_trim_at_a_decimal_point(create: Any) -> None:
     prices = "gold rose 2.14% then silver rose 1.51% then copper rose 3.75% " * 20
     create.return_value = _reply(f"The desk noted the shift. Overnight {prices}")
 
-    summary = summarize_portfolio([PortfolioQuote("TSLA", "Tesla", 250.1, -1.2)])
+    summary = summarize_markets([_headline()])
 
     assert len(summary) <= MAX_SUMMARY_CHARS
     assert summary == "The desk noted the shift."

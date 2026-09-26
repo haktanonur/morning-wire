@@ -1,9 +1,13 @@
 {
-  "symbols": [
-    { "ticker": "BOTZ", "label": "Global X Robotics & AI ETF" },
-    { "ticker": "KOID", "label": "Global X Humanoid Robotics ETF" },
-    { "ticker": "TSLA", "label": "Tesla" },
-    { "ticker": "IWM", "label": "iShares Russell 2000 ETF" },
-    { "ticker": "SOXQ", "label": "Invesco PHLX Semiconductor ETF" }
+  "holdings": [
+    { "ticker": "GC=F", "label": "Ons altin" },
+    { "ticker": "SI=F", "label": "Ons gumus" },
+    { "ticker": "EURTRY=X", "label": "Euro/TL" }
+  ],
+  "indices": [
+    { "ticker": "^GSPC", "label": "S&P 500" },
+    { "ticker": "^NDX", "label": "Nasdaq 100" },
+    { "ticker": "XU100.IS", "label": "BIST 100" },
+    { "ticker": "EURUSD=X", "label": "EUR/USD" }
   ]
 }

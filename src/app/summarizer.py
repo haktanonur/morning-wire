@@ -1,9 +1,14 @@
 """Turn raw fetcher output into short per-category summaries via the Claude API.
 
-One prompt template per category, as required by ``PLAN.md`` §5. The prompts do
-the filtering the fetchers deliberately skipped: Finnhub's ``general`` feed
-mixes macro stories with general world news, and AA Gündem carries sports
-stories that the sports category already covers.
+One prompt template per summarized category, as required by ``PLAN.md`` §5. The
+prompts do the filtering the fetchers deliberately skipped: Finnhub's
+``general`` feed mixes macro stories with general world news, and AA Gündem
+carries sports stories that the sports category already covers.
+
+Not every category belongs here. The portfolio and the vocabulary are both
+rendered by their own modules and never reach the model, for the same reason in
+two forms: the data is already the answer, and a model asked to restate it can
+restate it wrong where no reader could check.
 
 Unlike the fetchers, these functions *do* raise. A fetcher returning nothing is
 a normal outcome the summary can describe, but a failed API call leaves nothing
@@ -21,7 +26,6 @@ import anthropic
 from app.config import load_anthropic_settings
 from app.fetchers.general_news import REGION_TR, Article
 from app.fetchers.market_news import Headline
-from app.fetchers.portfolio import PortfolioQuote
 from app.fetchers.sports import NOTHING_NOTABLE, MatchResult
 
 logger = logging.getLogger(__name__)
@@ -74,13 +78,6 @@ MARKETS_PROMPT = (
     "story that matters most to an investor."
 )
 
-PORTFOLIO_PROMPT = (
-    "Summarize the state of this portfolio from the closing prices below. Say "
-    "which holdings rose and which fell and roughly by how much, and call out "
-    "anything unusually large. Name any holding marked 'no data' as unavailable "
-    "rather than skipping it silently."
-)
-
 NEWS_PROMPT = (
     "Summarize the day's current events from the headlines below. Your reply must "
     "be exactly three sentences, structured like this and overriding any other "
@@ -117,20 +114,6 @@ def _format_headlines(headlines: list[Headline]) -> str:
         + (f" — {headline.summary}" if headline.summary else "")
         for headline in headlines
     )
-
-
-def _format_quotes(quotes: list[PortfolioQuote]) -> str:
-    """Render portfolio quotes as one line per holding, including missing ones."""
-    lines = []
-    for quote in quotes:
-        if quote.close is None or quote.change_pct is None:
-            lines.append(f"- {quote.label} ({quote.ticker}): no data")
-        else:
-            lines.append(
-                f"- {quote.label} ({quote.ticker}): close {quote.close:.2f}, "
-                f"change {quote.change_pct:+.2f}%"
-            )
-    return "\n".join(lines)
 
 
 def _format_articles(articles: list[Article]) -> str:
@@ -239,13 +222,6 @@ def summarize_markets(headlines: list[Headline]) -> str:
     if not headlines:
         return NO_DATA
     return _summarize("MARKETS", MARKETS_PROMPT, _format_headlines(headlines))
-
-
-def summarize_portfolio(quotes: list[PortfolioQuote]) -> str:
-    """Summarize the portfolio category."""
-    if not quotes:
-        return NO_DATA
-    return _summarize("PORTFOLIO", PORTFOLIO_PROMPT, _format_quotes(quotes))
 
 
 def summarize_news(articles: list[Article]) -> str:
