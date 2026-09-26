@@ -172,8 +172,8 @@ INFO MARKETS ok in 2.4s, 312 chars.
 INFO PORTFOLIO ok in 3.1s, 590 chars.
 INFO NEWS ok in 2.8s, 401 chars.
 INFO SPORTS ok in 1.9s, 288 chars.
-INFO VOCAB ok in 0.0s, 15 words over 3 messages.
-INFO SMS relay accepted all 7 categories.
+INFO VOCAB ok in 0.0s, 10 words over 2 messages.
+INFO SMS relay accepted all 6 categories.
 ```
 
 ## Deployment

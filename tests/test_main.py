@@ -5,6 +5,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from app.fetchers.portfolio import PortfolioConfigError
+from app.fetchers.vocabulary import WORDS_PER_DAY
 from app.main import (
     Section,
     build_report,
@@ -24,9 +25,9 @@ CATEGORY_PATCHES = {
 }
 
 
-VOCABULARY_BODIES = ("first five words", "second five words", "third five words")
+VOCABULARY_BODIES = ("first five words", "second five words")
 
-VOCABULARY_HEADINGS = ["VOCAB 1/3", "VOCAB 2/3", "VOCAB 3/3"]
+VOCABULARY_HEADINGS = ["VOCAB 1/2", "VOCAB 2/2"]
 
 
 @pytest.fixture(autouse=True)
@@ -189,7 +190,7 @@ def test_main_reports_the_delivery_outcome(
     with caplog.at_level(logging.INFO, logger="app.main"):
         main([])
 
-    assert "accepted all 7" in caplog.text
+    assert f"accepted all {len(CATEGORY_PATCHES) + len(VOCABULARY_BODIES)}" in caplog.text
 
 
 def test_main_exits_non_zero_when_a_category_does_not_reach_the_relay(send: MagicMock) -> None:
@@ -242,7 +243,7 @@ def test_each_category_logs_its_name_duration_and_length(
 
     assert [record.getMessage() for record in caplog.records] == [
         *(f"{heading} ok in 0.0s, 15 chars." for heading in CATEGORY_PATCHES),
-        "VOCAB ok in 0.0s, 15 words over 3 messages.",
+        f"VOCAB ok in 0.0s, {WORDS_PER_DAY} words over {len(VOCABULARY_BODIES)} messages.",
     ]
 
 
